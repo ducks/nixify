@@ -194,3 +194,149 @@ fn baseline_overlap_does_not_claim_equivalence_or_change_generation() {
     assert!(text.contains("do not prove equivalence"));
     assert!(text.contains("`git`"));
 }
+
+#[test]
+fn systemd_distinguishes_persistent_enablement_and_running_state() {
+    use nixify::{inventory::Scope, service_mapping, systemd};
+    let mut inv = fixture();
+    inv.service_scopes = vec![
+        systemd::from_outputs(Scope::System, Some("sshd.service enabled enabled\nnginx.service disabled disabled\nNetworkManager.service enabled enabled\ncustom.service enabled enabled\n"), Some("nginx.service loaded active running Web server\nsshd.service loaded active running OpenSSH\n")),
+        systemd::from_outputs(Scope::User, Some("caddy.service enabled enabled\n"), None),
+    ];
+    inv.validate().unwrap();
+    let decisions = service_mapping::decisions(&inv);
+    let ssh = decisions
+        .iter()
+        .find(|d| d.service == "sshd.service")
+        .unwrap();
+    assert_eq!(ssh.nixos_option, Some("services.openssh.enable"));
+    assert_eq!(ssh.running, Some(true));
+    let nginx = decisions
+        .iter()
+        .find(|d| d.service == "nginx.service")
+        .unwrap();
+    assert_eq!(nginx.nixos_option, None);
+    assert_eq!(nginx.running, Some(true));
+    let user = decisions
+        .iter()
+        .find(|d| d.service == "caddy.service")
+        .unwrap();
+    assert_eq!(user.nixos_option, None);
+    assert_eq!(user.running, None);
+    let script = output::services_nix(&decisions);
+    assert!(script.contains("services.openssh.enable = true;"));
+    assert!(script.contains("networking.networkmanager.enable = true;"));
+    assert!(!script.contains("services.nginx.enable"));
+    assert!(!script.contains("services.caddy.enable"));
+    let report = output::report(&inv, &mapping::decisions(&inv));
+    assert!(report.contains("custom.service"));
+    assert!(report.contains("runtime;") || report.contains("running-state unavailable"));
+}
+
+#[test]
+fn malformed_or_unavailable_systemd_queries_remain_unknown() {
+    use nixify::{inventory::Scope, systemd};
+    let scope = systemd::from_outputs(
+        Scope::System,
+        Some("invalid extra data"),
+        Some("sshd.service loaded active running SSH"),
+    );
+    assert!(!scope.unit_files_available);
+    assert!(scope.runtime_available);
+    assert_eq!(scope.services[0].unit_file_state, None);
+    assert_eq!(scope.services[0].running, Some(true));
+    let unknown = systemd::from_outputs(Scope::User, None, None);
+    assert!(!unknown.runtime_available && !unknown.unit_files_available);
+}
+
+#[test]
+fn inventory_from_previous_milestone_is_still_readable() {
+    let mut value = serde_json::to_value(fixture()).unwrap();
+    value.as_object_mut().unwrap().remove("service_scopes");
+    value.as_object_mut().unwrap().remove("desktop");
+    let decoded: Inventory = serde_json::from_value(value).unwrap();
+    decoded.validate().unwrap();
+    assert!(decoded.service_scopes.is_empty());
+}
+
+#[test]
+fn desktop_signals_remain_distinct_and_suggestions_are_inert() {
+    use nixify::{
+        desktop::{self, DesktopKind, SessionType},
+        inventory::{Package, Scope},
+        systemd,
+    };
+    let mut inv = fixture();
+    inv.packages.push(Package {
+        name: "gnome-shell".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    inv.packages.push(Package {
+        name: "hyprland".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    inv.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("gdm.service enabled enabled\n"),
+        None,
+    )];
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir_all(root.path().join("usr/share/wayland-sessions")).unwrap();
+    fs::write(
+        root.path()
+            .join("usr/share/wayland-sessions/hyprland.desktop"),
+        "PRIVATE=not-read",
+    )
+    .unwrap();
+    let desktop = desktop::detect(&inv, Some("Hyprland"), Some("wayland"), root.path());
+    assert_eq!(
+        desktop.current_process_session_type,
+        Some(SessionType::Wayland)
+    );
+    let hypr = desktop
+        .candidates
+        .iter()
+        .find(|x| x.kind == DesktopKind::Hyprland)
+        .unwrap();
+    assert!(hypr.current_process_session_hint && hypr.wayland_session_file == Some(true));
+    let gnome = desktop
+        .candidates
+        .iter()
+        .find(|x| x.kind == DesktopKind::Gnome)
+        .unwrap();
+    assert!(!gnome.current_process_session_hint);
+    inv.desktop = Some(desktop);
+    assert_eq!(desktop::enabled_display_managers(&inv), vec!["GDM"]);
+    let module = output::desktop_nix(&inv);
+    assert!(module.contains("# programs.hyprland.enable = true;"));
+    assert!(module.contains("# services.desktopManager.gnome.enable = true;"));
+    assert!(!module
+        .lines()
+        .any(|line| line.trim_start().starts_with("programs.hyprland")));
+    assert!(!serde_json::to_string(&inv)
+        .unwrap()
+        .contains("PRIVATE=not-read"));
+}
+
+#[test]
+fn unrecognized_session_input_is_not_retained_or_guessed() {
+    let inv = fixture();
+    let root = tempfile::tempdir().unwrap();
+    let desktop = nixify::desktop::detect(
+        &inv,
+        Some("secret-token"),
+        Some("secret-token"),
+        root.path(),
+    );
+    assert!(desktop.candidates.is_empty());
+    assert!(desktop.current_process_session_type.is_none());
+    assert!(!serde_json::to_string(&desktop)
+        .unwrap()
+        .contains("secret-token"));
+}
