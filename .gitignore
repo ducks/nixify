@@ -1,0 +1,6 @@
+/target
+/result
+/result-*
+/inventory.json
+/baseline.json
+/nixos-migration/

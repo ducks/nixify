@@ -1,0 +1,4 @@
+base-devel
+foreign-tool
+git
+neovim

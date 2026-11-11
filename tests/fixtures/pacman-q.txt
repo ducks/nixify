@@ -1,0 +1,5 @@
+base-devel 1-2
+foreign-tool 4.0-1
+git 2.50.1-1
+libexample 1.0-1
+neovim 0.11.0-1

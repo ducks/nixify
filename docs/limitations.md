@@ -1,0 +1,9 @@
+# Limitations
+
+- Only Manjaro package discovery is implemented. No service, desktop, hardware, network, filesystem, private configuration or user-environment discovery is performed.
+- The output is a package-module draft, report and inventory, not an installable flake or complete NixOS configuration. No `validate` command exists yet.
+- Mappings are a small manually curated allowlist and are not checked against a target revision. Names can conceal differences in package features and behavior.
+- Foreign packages may be local, third-party, removed from sync repositories, or AUR; no specific provenance is inferred. Packages marked explicitly installed may have been selected by the original system image or installer.
+- Baseline overlap is exact `pname` comparison against a minimal NixOS configuration evaluated from the specified checkout. It is not behavioral equivalence or a full source-to-target package mapping, and does not suppress generated packages. The target might use different modules or a different Nixpkgs revision.
+- Queries are separate snapshots; database inconsistencies are detected where possible, but changes that preserve set membership can go unnoticed. The process times out after 30 seconds and limits captured output to 4 MiB per stream.
+- Nix package builds and live baseline evaluation may require access to the Nix daemon or other local Nix resources. This environment cannot access the daemon socket; `nix build` and `nix flake check` remain unverified here.
