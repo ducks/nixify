@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use nixify::{baseline, inventory::Inventory, manjaro, mapping, output};
+use nixify::{baseline, draft, inventory::Inventory, manjaro, mapping, output};
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
@@ -30,7 +30,12 @@ enum Command {
         input: PathBuf,
         #[arg(long)]
         output: PathBuf,
+        /// Full pinned Nixpkgs Git revision (defaults to nixify's locked revision).
+        #[arg(long)]
+        nixpkgs_rev: Option<String>,
     },
+    /// Check Nix syntax without resolving inputs, building, or activating.
+    Validate { directory: PathBuf },
     /// Evaluate the default NixOS system packages from a local Nixpkgs checkout.
     Baseline {
         #[arg(long)]
@@ -81,10 +86,27 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 print!("{data}");
             }
         }
-        Command::Generate { input, output: dir } => {
+        Command::Generate {
+            input,
+            output: dir,
+            nixpkgs_rev,
+        } => {
             let inventory = read_inventory(&input)?;
-            output::generate(&inventory, &dir)?;
+            let revision = match nixpkgs_rev {
+                Some(revision) => revision,
+                None => draft::default_revision().map_err(std::io::Error::other)?,
+            };
+            output::generate_with_revision(&inventory, &dir, &revision)?;
             eprintln!("Wrote migration draft to {}", dir.display());
+        }
+        Command::Validate { directory } => {
+            draft::validate_syntax(&directory).map_err(std::io::Error::other)?;
+            println!(
+                "Syntax: passed ({} generated Nix files)",
+                draft::NIX_FILES.len()
+            );
+            println!("Nixpkgs attributes: not checked\nNixOS module evaluation: not checked\nSystem build: not checked\nBoot and services: not checked");
+            println!("This is an incomplete migration draft; passing syntax checks does not make it installable.");
         }
         Command::Baseline { nixpkgs, output } => {
             let data = serde_json::to_string_pretty(&baseline::evaluate(&nixpkgs)?)? + "\n";

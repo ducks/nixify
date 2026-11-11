@@ -143,10 +143,26 @@ fn create_file(path: &Path, data: &str) -> io::Result<()> {
     file.write_all(data.as_bytes())
 }
 pub fn generate(inventory: &Inventory, dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let revision = crate::draft::default_revision().map_err(io::Error::other)?;
+    generate_with_revision(inventory, dir, &revision)
+}
+pub fn generate_with_revision(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     inventory.validate().map_err(io::Error::other)?;
+    let flake =
+        crate::draft::flake(&inventory.source.architecture, revision).map_err(io::Error::other)?;
+    let revision = crate::draft::normalize_revision(revision).map_err(io::Error::other)?;
     let decisions = mapping::decisions(inventory);
     // Never overwrite a previous output, including partially generated drafts.
     fs::create_dir(dir)?;
+    create_file(&dir.join("flake.nix"), &flake)?;
+    create_file(
+        &dir.join("configuration.nix"),
+        crate::draft::configuration(),
+    )?;
     create_file(&dir.join("packages.nix"), &packages_nix(&decisions))?;
     create_file(
         &dir.join("services.nix"),
@@ -155,7 +171,7 @@ pub fn generate(inventory: &Inventory, dir: &Path) -> Result<(), Box<dyn std::er
     create_file(&dir.join("desktop.nix"), &desktop_nix(inventory))?;
     create_file(
         &dir.join("migration-report.md"),
-        &report(inventory, &decisions),
+        &format!("{}\n## Target draft\n\n- Nixpkgs revision: `{}` (not yet resolved or validated).\n- No flake.lock was generated.\n- Supply reviewed hardware, boot, filesystems, users, networking and system.stateVersion before use.\n", report(inventory, &decisions), revision),
     )?;
     let mut sorted = inventory.clone();
     sorted.packages.sort_by(|a, b| a.name.cmp(&b.name));
