@@ -426,3 +426,35 @@ fn attribute_check_requires_unedited_generated_inputs() {
         .unwrap_err()
         .contains("edited"));
 }
+
+#[test]
+fn module_evaluation_is_explicit_and_preserves_failed_assertions() {
+    let temp = tempfile::tempdir().unwrap();
+    let project = temp.path().join("project");
+    let nixpkgs = temp.path().join("nixpkgs");
+    fs::create_dir(&project).unwrap();
+    fs::create_dir(&nixpkgs).unwrap();
+    let result = nixify::draft::evaluate_modules_with(&project, &nixpkgs, &fixture(), |args| {
+        assert!(args.contains(&"--eval"));
+        assert!(!args.contains(&"--build"));
+        assert!(!args.iter().any(|s| s.contains("switch-to-configuration")));
+        Ok(r#"{"state_version":"24.11","system_package_count":10,"failed_assertions":["fixture failure"]}"#.into())
+    }).unwrap();
+    assert_eq!(result.failed_assertions, vec!["fixture failure"]);
+    assert!(
+        nixify::draft::evaluate_modules_with(&project, &nixpkgs, &fixture(), |_| Ok(
+            "not json".into()
+        ))
+        .is_err()
+    );
+}
+
+#[test]
+fn module_evaluation_requires_explicit_nixpkgs_path() {
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["validate", "somewhere", "--evaluate-modules"])
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("--nixpkgs"));
+}
