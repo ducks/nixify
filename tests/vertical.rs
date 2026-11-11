@@ -340,3 +340,89 @@ fn unrecognized_session_input_is_not_retained_or_guessed() {
         .unwrap()
         .contains("secret-token"));
 }
+
+#[test]
+fn draft_pins_revision_and_does_not_invent_hardware_or_lock() {
+    let inv = fixture();
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    let rev = "0123456789abcdef0123456789abcdef01234567";
+    output::generate_with_revision(&inv, &dir, rev).unwrap();
+    let flake = fs::read_to_string(dir.join("flake.nix")).unwrap();
+    assert!(flake.contains(rev));
+    assert!(flake.contains("x86_64-linux"));
+    assert!(!dir.join("flake.lock").exists());
+    assert!(!dir.join("hardware-configuration.nix").exists());
+    let config = fs::read_to_string(dir.join("configuration.nix")).unwrap();
+    assert!(config.contains("not a bootable or installable"));
+    assert!(!config
+        .lines()
+        .any(|line| line.trim_start().starts_with("system.stateVersion =")));
+    let invalid_dir = temp.path().join("invalid");
+    assert!(output::generate_with_revision(&inv, &invalid_dir, "bad\"; dangerous").is_err());
+    assert!(!invalid_dir.exists());
+}
+
+#[test]
+fn syntax_validation_checks_all_files_and_stops_on_failure() {
+    use nixify::draft;
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    output::generate(&fixture(), &dir).unwrap();
+    let mut checked = Vec::new();
+    draft::validate_syntax_with(&dir, |path| {
+        checked.push(path.file_name().unwrap().to_owned());
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(checked.len(), draft::NIX_FILES.len());
+    let err = draft::validate_syntax_with(&dir, |path| {
+        if path.ends_with("packages.nix") {
+            Err("bad syntax".into())
+        } else {
+            Ok(())
+        }
+    })
+    .unwrap_err();
+    assert_eq!(err, "bad syntax");
+    fs::remove_file(dir.join("desktop.nix")).unwrap();
+    assert!(draft::validate_syntax_with(&dir, |_| Ok(())).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn syntax_validation_refuses_symlinked_input_files() {
+    use std::os::unix::fs::symlink;
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    output::generate(&fixture(), &dir).unwrap();
+    fs::remove_file(dir.join("desktop.nix")).unwrap();
+    symlink(dir.join("packages.nix"), dir.join("desktop.nix")).unwrap();
+    assert!(nixify::draft::validate_syntax_with(&dir, |_| Ok(()))
+        .unwrap_err()
+        .contains("non-symlink"));
+}
+
+#[test]
+fn attribute_check_requires_unedited_generated_inputs() {
+    let inventory = fixture();
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    output::generate(&inventory, &dir).unwrap();
+    let (revision, attrs) = nixify::draft::expected_attributes(&dir, &inventory).unwrap();
+    assert_eq!(revision.len(), 40);
+    assert_eq!(attrs, vec!["git", "neovim"]);
+    let packages = dir.join("packages.nix");
+    let original = fs::read_to_string(&packages).unwrap();
+    fs::write(&packages, format!("{original}# manual edit\n")).unwrap();
+    assert!(nixify::draft::expected_attributes(&dir, &inventory)
+        .unwrap_err()
+        .contains("edited"));
+    fs::write(&packages, original).unwrap();
+    let flake = dir.join("flake.nix");
+    let original = fs::read_to_string(&flake).unwrap();
+    fs::write(&flake, format!("{original}# manual edit\n")).unwrap();
+    assert!(nixify::draft::expected_attributes(&dir, &inventory)
+        .unwrap_err()
+        .contains("edited"));
+}
