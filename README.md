@@ -2,7 +2,7 @@
 
 `nixify` is a read-only Linux-to-NixOS migration assistant. The first milestone inventories Manjaro packages and systemd services and produces conservative package and service modules with a review report. It does not install NixOS, modify source configuration, execute service scripts, or partition disks.
 
-This is **an early migration draft, not a bootable system**. Desktop discovery, hardware, complete flake generation, pinned-revision mapping validation, and `validate` are not implemented yet. Curated mappings must be verified against your selected Nixpkgs revision.
+This is **an early migration draft, not a bootable system**. Hardware discovery, complete flake generation, pinned-revision mapping validation, and `validate` are not implemented yet. Desktop discovery is limited to a small set of recognizable signals. Curated mappings must be verified against your selected Nixpkgs revision.
 
 ## Use
 
@@ -20,6 +20,13 @@ Generated `packages.nix` includes only explicitly installed, non-foreign package
 
 `services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. Service names and status are included in the inventory and may reveal sensitive information.
 
+
+`desktop.nix` contains commented suggestions for recognized desktop packages,
+session files and process session hints. No desktop or display manager is
+selected automatically. Installed packages and available sessions do not prove
+which desktop is configured by default; confirm the options for your target
+NixOS version before enabling one.
+
 ## Optional NixOS baseline
 
 With Nix installed, evaluate a local Nixpkgs checkout (this does not build or activate a system), then compare names:
@@ -33,7 +40,7 @@ For a channel-based installation, the local path may be `/nix/var/nix/profiles/p
 
 ## Privacy
 
-Inventories disclose installed package names, versions, origin flags, architecture and distribution. Treat them as sensitive. The scanner does not read private keys, credentials, home directories, Wi-Fi settings, arbitrary environment variables or service configuration. Inventory and draft files are created with owner-only permissions on Unix. Review before sharing. A requested Nixpkgs baseline runs `nix-instantiate` on the specified checkout, so only evaluate a source you trust.
+Inventories disclose installed package names, versions, origin flags, architecture and distribution. Treat them as sensitive. The scanner does not read private keys, credentials, home directories, Wi-Fi settings, arbitrary environment variables or service configuration. It reads only `XDG_CURRENT_DESKTOP` and `XDG_SESSION_TYPE` as optional session hints, retaining recognized values only; it checks known session-file paths without reading their contents. Inventory and draft files are created with owner-only permissions on Unix. Review before sharing. A requested Nixpkgs baseline runs `nix-instantiate` on the specified checkout, so only evaluate a source you trust.
 
 ## Development
 

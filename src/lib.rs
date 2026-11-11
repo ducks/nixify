@@ -1,4 +1,5 @@
 pub mod baseline;
+pub mod desktop;
 pub mod inventory;
 pub mod manjaro;
 pub mod mapping;

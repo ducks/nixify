@@ -188,7 +188,7 @@ pub fn inventory(
             ],
         })
         .collect();
-    Ok(Inventory { schema_version: 1, source: Source { distribution: id, architecture: architecture.into(), evidence: "/etc/os-release:ID".into() }, packages, service_scopes: Vec::new(), warnings: vec!["Foreign means absent from configured sync databases; it does not establish AUR origin.".into(), "Desktop, hardware, and networking require separate review.".into()] })
+    Ok(Inventory { schema_version: 1, source: Source { distribution: id, architecture: architecture.into(), evidence: "/etc/os-release:ID".into() }, packages, service_scopes: Vec::new(), desktop: None, warnings: vec!["Foreign means absent from configured sync databases; it does not establish AUR origin.".into(), "Desktop, hardware, and networking require separate review.".into()] })
 }
 pub fn scan(requested: Option<&str>) -> Result<Inventory, ScanError> {
     let os = os_release()?;
@@ -227,5 +227,6 @@ pub fn scan(requested: Option<&str>) -> Result<Inventory, ScanError> {
             ));
         }
     }
+    inventory.desktop = Some(crate::desktop::scan(&inventory));
     Ok(inventory)
 }

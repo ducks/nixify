@@ -253,7 +253,90 @@ fn malformed_or_unavailable_systemd_queries_remain_unknown() {
 fn inventory_from_previous_milestone_is_still_readable() {
     let mut value = serde_json::to_value(fixture()).unwrap();
     value.as_object_mut().unwrap().remove("service_scopes");
+    value.as_object_mut().unwrap().remove("desktop");
     let decoded: Inventory = serde_json::from_value(value).unwrap();
     decoded.validate().unwrap();
     assert!(decoded.service_scopes.is_empty());
+}
+
+#[test]
+fn desktop_signals_remain_distinct_and_suggestions_are_inert() {
+    use nixify::{
+        desktop::{self, DesktopKind, SessionType},
+        inventory::{Package, Scope},
+        systemd,
+    };
+    let mut inv = fixture();
+    inv.packages.push(Package {
+        name: "gnome-shell".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    inv.packages.push(Package {
+        name: "hyprland".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    inv.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("gdm.service enabled enabled\n"),
+        None,
+    )];
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir_all(root.path().join("usr/share/wayland-sessions")).unwrap();
+    fs::write(
+        root.path()
+            .join("usr/share/wayland-sessions/hyprland.desktop"),
+        "PRIVATE=not-read",
+    )
+    .unwrap();
+    let desktop = desktop::detect(&inv, Some("Hyprland"), Some("wayland"), root.path());
+    assert_eq!(
+        desktop.current_process_session_type,
+        Some(SessionType::Wayland)
+    );
+    let hypr = desktop
+        .candidates
+        .iter()
+        .find(|x| x.kind == DesktopKind::Hyprland)
+        .unwrap();
+    assert!(hypr.current_process_session_hint && hypr.wayland_session_file == Some(true));
+    let gnome = desktop
+        .candidates
+        .iter()
+        .find(|x| x.kind == DesktopKind::Gnome)
+        .unwrap();
+    assert!(!gnome.current_process_session_hint);
+    inv.desktop = Some(desktop);
+    assert_eq!(desktop::enabled_display_managers(&inv), vec!["GDM"]);
+    let module = output::desktop_nix(&inv);
+    assert!(module.contains("# programs.hyprland.enable = true;"));
+    assert!(module.contains("# services.desktopManager.gnome.enable = true;"));
+    assert!(!module
+        .lines()
+        .any(|line| line.trim_start().starts_with("programs.hyprland")));
+    assert!(!serde_json::to_string(&inv)
+        .unwrap()
+        .contains("PRIVATE=not-read"));
+}
+
+#[test]
+fn unrecognized_session_input_is_not_retained_or_guessed() {
+    let inv = fixture();
+    let root = tempfile::tempdir().unwrap();
+    let desktop = nixify::desktop::detect(
+        &inv,
+        Some("secret-token"),
+        Some("secret-token"),
+        root.path(),
+    );
+    assert!(desktop.candidates.is_empty());
+    assert!(desktop.current_process_session_type.is_none());
+    assert!(!serde_json::to_string(&desktop)
+        .unwrap()
+        .contains("secret-token"));
 }

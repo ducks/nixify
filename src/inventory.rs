@@ -8,6 +8,8 @@ pub struct Inventory {
     pub packages: Vec<Package>,
     #[serde(default)]
     pub service_scopes: Vec<ServiceScope>,
+    #[serde(default)]
+    pub desktop: Option<crate::desktop::DesktopInventory>,
     pub warnings: Vec<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,6 +108,19 @@ impl Inventory {
                         || !state.bytes().all(|c| c.is_ascii_lowercase() || c == b'-')
                 }) {
                     return Err(format!("invalid service state for {}", service.name));
+                }
+            }
+        }
+        if let Some(desktop) = &self.desktop {
+            let mut kinds = std::collections::BTreeSet::new();
+            for candidate in &desktop.candidates {
+                if !kinds.insert(candidate.kind)
+                    || candidate
+                        .installed_packages
+                        .iter()
+                        .any(|name| !valid_package_name(name))
+                {
+                    return Err("invalid or duplicate desktop candidate".into());
                 }
             }
         }
