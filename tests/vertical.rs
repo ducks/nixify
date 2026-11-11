@@ -402,3 +402,27 @@ fn syntax_validation_refuses_symlinked_input_files() {
         .unwrap_err()
         .contains("non-symlink"));
 }
+
+#[test]
+fn attribute_check_requires_unedited_generated_inputs() {
+    let inventory = fixture();
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    output::generate(&inventory, &dir).unwrap();
+    let (revision, attrs) = nixify::draft::expected_attributes(&dir, &inventory).unwrap();
+    assert_eq!(revision.len(), 40);
+    assert_eq!(attrs, vec!["git", "neovim"]);
+    let packages = dir.join("packages.nix");
+    let original = fs::read_to_string(&packages).unwrap();
+    fs::write(&packages, format!("{original}# manual edit\n")).unwrap();
+    assert!(nixify::draft::expected_attributes(&dir, &inventory)
+        .unwrap_err()
+        .contains("edited"));
+    fs::write(&packages, original).unwrap();
+    let flake = dir.join("flake.nix");
+    let original = fs::read_to_string(&flake).unwrap();
+    fs::write(&flake, format!("{original}# manual edit\n")).unwrap();
+    assert!(nixify::draft::expected_attributes(&dir, &inventory)
+        .unwrap_err()
+        .contains("edited"));
+}

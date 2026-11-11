@@ -2,7 +2,7 @@
 
 `nixify` is a read-only Linux-to-NixOS migration assistant. The first milestone inventories Manjaro packages and systemd services and produces conservative package and service modules with a review report. It does not install NixOS, modify source configuration, execute service scripts, or partition disks.
 
-This is **an early migration draft, not a bootable system**. Hardware discovery, revision-bound mapping checks, and NixOS module evaluation are not implemented yet. The generated flake is intentionally incomplete. Desktop discovery is limited to a small set of recognizable signals. Curated mappings must be verified against your selected Nixpkgs revision.
+This is **an early migration draft, not a bootable system**. Hardware discovery and NixOS module evaluation are not implemented yet. Package-attribute checks are available against an explicitly supplied local checkout. The generated flake is intentionally incomplete. Desktop discovery is limited to a small set of recognizable signals. Curated mappings must be verified against your selected Nixpkgs revision.
 
 ## Use
 
@@ -22,7 +22,7 @@ Generated `packages.nix` includes only explicitly installed, non-foreign package
 `services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. Service names and status are included in the inventory and may reveal sensitive information.
 
 
-The generated flake pins the Nixpkgs commit used by nixify's own flake lock by default. To use a different full 40-character commit, pass `--nixpkgs-rev <commit>` to `generate`. No `flake.lock` is created until inputs are explicitly resolved. Supply reviewed hardware configuration, bootloader, filesystems, users, networking and an appropriate `system.stateVersion` before any installation. The `nixify validate` command requires Nix and checks **syntax only**; it does not resolve attributes, evaluate the module system, build, boot or activate a system. A syntax pass is not a migration success.
+The generated flake pins the Nixpkgs commit used by nixify's own flake lock by default. To use a different full 40-character commit, pass `--nixpkgs-rev <commit>` to `generate`. No `flake.lock` is created until inputs are explicitly resolved. Supply reviewed hardware configuration, bootloader, filesystems, users, networking and an appropriate `system.stateVersion` before any installation. The `nixify validate` command requires Nix and checks syntax. Optionally use `nixify validate ./nixos-migration --nixpkgs /path/to/nixpkgs` to check the generated package attributes against a local checkout. The attribute check requires the generated flake and packages module to remain unedited; it reports if the checkout's `.git-revision` differs from the target pin or is unavailable. A matching file is self-reported metadata, not authenticated checkout content. The check does not establish package equivalence, evaluate the module system, build, boot or activate a system. A syntax pass is not a migration success.
 
 `desktop.nix` contains commented suggestions for recognized desktop packages,
 session files and process session hints. No desktop or display manager is

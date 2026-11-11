@@ -95,3 +95,161 @@ pub fn validate_syntax(dir: &Path) -> Result<(), String> {
         Ok(())
     })
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum RevisionEvidence {
+    DeclaredMatch,
+    DeclaredMismatch(String),
+    Unavailable,
+}
+#[derive(Debug)]
+pub struct AttributeCheck {
+    pub checkout: std::path::PathBuf,
+    pub target_revision: String,
+    pub revision_evidence: RevisionEvidence,
+    pub attributes: std::collections::BTreeMap<String, bool>,
+}
+
+/// Accept only an unedited generated flake and packages module. Otherwise the
+/// inventory cannot establish what the Nix files actually reference.
+pub fn expected_attributes(
+    dir: &Path,
+    inventory: &crate::inventory::Inventory,
+) -> Result<(String, Vec<String>), String> {
+    inventory.validate()?;
+    let flake_text = fs::read_to_string(dir.join("flake.nix"))
+        .map_err(|e| format!("cannot read flake.nix: {e}"))?;
+    let prefix = "  inputs.nixpkgs.url = \"github:NixOS/nixpkgs/";
+    let revision = flake_text
+        .lines()
+        .find_map(|line| line.strip_prefix(prefix)?.strip_suffix("\";"))
+        .ok_or("flake.nix is not the original generated flake; target pin cannot be established")?;
+    let revision = normalize_revision(revision)?;
+    if flake(&inventory.source.architecture, &revision)? != flake_text {
+        return Err("flake.nix was edited; target pin cannot be verified by this check".into());
+    }
+    let decisions = crate::mapping::decisions(inventory);
+    let package_text = fs::read_to_string(dir.join("packages.nix"))
+        .map_err(|e| format!("cannot read packages.nix: {e}"))?;
+    if package_text != crate::output::packages_nix(&decisions) {
+        return Err(
+            "packages.nix or inventory was edited; cannot reliably enumerate referenced attributes"
+                .into(),
+        );
+    }
+    let attrs = decisions
+        .into_iter()
+        .filter_map(|d| d.nixpkgs_attribute)
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    Ok((revision, attrs))
+}
+
+fn revision_evidence(checkout: &Path, target: &str) -> RevisionEvidence {
+    use std::io::Read;
+    let mut text = String::new();
+    let ok = fs::File::open(checkout.join(".git-revision"))
+        .and_then(|f| f.take(129).read_to_string(&mut text))
+        .is_ok();
+    if !ok || text.len() > 128 {
+        return RevisionEvidence::Unavailable;
+    }
+    match normalize_revision(text.trim()) {
+        Ok(revision) if revision == target => RevisionEvidence::DeclaredMatch,
+        Ok(revision) => RevisionEvidence::DeclaredMismatch(revision),
+        Err(_) => RevisionEvidence::Unavailable,
+    }
+}
+
+const ATTRIBUTE_EXPRESSION: &str = r#"{ nixpkgsPath, system, attributesJson }:
+let
+  pkgs = import (builtins.toPath nixpkgsPath) { inherit system; };
+  attrs = builtins.fromJSON attributesJson;
+in builtins.listToAttrs (map (name: { inherit name; value = builtins.hasAttr name pkgs; }) attrs)
+"#;
+
+pub fn check_attributes(
+    dir: &Path,
+    inventory: &crate::inventory::Inventory,
+    nixpkgs: &Path,
+) -> Result<AttributeCheck, String> {
+    let (target_revision, attrs) = expected_attributes(dir, inventory)?;
+    let checkout =
+        fs::canonicalize(nixpkgs).map_err(|e| format!("cannot access Nixpkgs checkout: {e}"))?;
+    let nixpkgs_path = checkout
+        .to_str()
+        .ok_or("Nixpkgs path must be valid UTF-8")?;
+    let system = match inventory.source.architecture.as_str() {
+        "x86_64" => "x86_64-linux",
+        "aarch64" => "aarch64-linux",
+        _ => return Err("unsupported target architecture".into()),
+    };
+    let attrs_json = serde_json::to_string(&attrs).map_err(|e| e.to_string())?;
+    let data = crate::manjaro::run_bounded(
+        "nix-instantiate",
+        &[
+            "--eval",
+            "--strict",
+            "--json",
+            "-E",
+            ATTRIBUTE_EXPRESSION,
+            "--argstr",
+            "nixpkgsPath",
+            nixpkgs_path,
+            "--argstr",
+            "system",
+            system,
+            "--argstr",
+            "attributesJson",
+            &attrs_json,
+        ],
+        false,
+    )
+    .map_err(|e| format!("attribute check failed: {e}"))?;
+    let attributes: std::collections::BTreeMap<String, bool> = serde_json::from_str(&data)
+        .map_err(|e| format!("invalid attribute evaluation result: {e}"))?;
+    if attributes.len() != attrs.len() || attrs.iter().any(|a| !attributes.contains_key(a)) {
+        return Err("attribute evaluation returned incomplete results".into());
+    }
+    let revision_evidence = revision_evidence(&checkout, &target_revision);
+    Ok(AttributeCheck {
+        checkout,
+        target_revision,
+        revision_evidence,
+        attributes,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn revision_metadata_is_only_a_declared_match() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(
+            revision_evidence(dir.path(), target),
+            RevisionEvidence::Unavailable
+        );
+        fs::write(dir.path().join(".git-revision"), format!("{target}\n")).unwrap();
+        assert_eq!(
+            revision_evidence(dir.path(), target),
+            RevisionEvidence::DeclaredMatch
+        );
+        fs::write(
+            dir.path().join(".git-revision"),
+            "ffffffffffffffffffffffffffffffffffffffff",
+        )
+        .unwrap();
+        assert!(matches!(
+            revision_evidence(dir.path(), target),
+            RevisionEvidence::DeclaredMismatch(_)
+        ));
+        fs::write(dir.path().join(".git-revision"), "untrusted text").unwrap();
+        assert_eq!(
+            revision_evidence(dir.path(), target),
+            RevisionEvidence::Unavailable
+        );
+    }
+}

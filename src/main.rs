@@ -35,7 +35,12 @@ enum Command {
         nixpkgs_rev: Option<String>,
     },
     /// Check Nix syntax without resolving inputs, building, or activating.
-    Validate { directory: PathBuf },
+    Validate {
+        directory: PathBuf,
+        /// Check generated package names against this local Nixpkgs checkout.
+        #[arg(long)]
+        nixpkgs: Option<PathBuf>,
+    },
     /// Evaluate the default NixOS system packages from a local Nixpkgs checkout.
     Baseline {
         #[arg(long)]
@@ -99,14 +104,48 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             output::generate_with_revision(&inventory, &dir, &revision)?;
             eprintln!("Wrote migration draft to {}", dir.display());
         }
-        Command::Validate { directory } => {
+        Command::Validate { directory, nixpkgs } => {
             draft::validate_syntax(&directory).map_err(std::io::Error::other)?;
             println!(
                 "Syntax: passed ({} generated Nix files)",
                 draft::NIX_FILES.len()
             );
-            println!("Nixpkgs attributes: not checked\nNixOS module evaluation: not checked\nSystem build: not checked\nBoot and services: not checked");
-            println!("This is an incomplete migration draft; passing syntax checks does not make it installable.");
+            let mut missing = false;
+            if let Some(checkout) = nixpkgs {
+                let inventory = read_inventory(&directory.join("inventory.json"))?;
+                let checked = draft::check_attributes(&directory, &inventory, &checkout)
+                    .map_err(std::io::Error::other)?;
+                println!("Nixpkgs checkout: {}", checked.checkout.display());
+                println!("Target pinned revision: {}", checked.target_revision);
+                match checked.revision_evidence {
+                    draft::RevisionEvidence::DeclaredMatch => println!("Revision: checkout .git-revision matches the target pin (self-reported metadata; content not authenticated)"),
+                    draft::RevisionEvidence::DeclaredMismatch(rev) => println!("Revision: checkout declares {rev}; it differs from the target pin, so the target revision is not validated"),
+                    draft::RevisionEvidence::Unavailable => println!("Revision: checkout revision unavailable; target pin is not validated"),
+                }
+                if checked.attributes.is_empty() {
+                    println!("Package attributes: none selected");
+                }
+                for (attribute, exists) in &checked.attributes {
+                    println!(
+                        "Package attribute {attribute}: {}",
+                        if *exists {
+                            "exists in supplied checkout"
+                        } else {
+                            "missing in supplied checkout"
+                        }
+                    );
+                    missing |= !exists;
+                }
+            } else {
+                println!("Nixpkgs attributes: not checked");
+            }
+            println!("NixOS module evaluation: not checked\nSystem build: not checked\nBoot and services: not checked");
+            println!("This is an incomplete migration draft; passing these checks does not make it installable.");
+            if missing {
+                return Err(
+                    "one or more package attributes are missing from the supplied checkout".into(),
+                );
+            }
         }
         Command::Baseline { nixpkgs, output } => {
             let data = serde_json::to_string_pretty(&baseline::evaluate(&nixpkgs)?)? + "\n";
