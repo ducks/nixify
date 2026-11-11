@@ -1,8 +1,8 @@
 # nixify
 
-`nixify` is a read-only Linux-to-NixOS migration assistant. The first milestone inventories Manjaro packages and produces a conservative package module and review report. It does not install NixOS, modify source configuration, execute service scripts, or partition disks.
+`nixify` is a read-only Linux-to-NixOS migration assistant. The first milestone inventories Manjaro packages and systemd services and produces conservative package and service modules with a review report. It does not install NixOS, modify source configuration, execute service scripts, or partition disks.
 
-This is **an early migration draft, not a bootable system**. Service and desktop discovery, hardware, complete flake generation, pinned-revision mapping validation, and `validate` are not implemented yet. Curated mappings must be verified against your selected Nixpkgs revision.
+This is **an early migration draft, not a bootable system**. Desktop discovery, hardware, complete flake generation, pinned-revision mapping validation, and `validate` are not implemented yet. Curated mappings must be verified against your selected Nixpkgs revision.
 
 ## Use
 
@@ -14,9 +14,11 @@ nixify report --input inventory.json
 nixify generate --input inventory.json --output ./nixos-migration
 ```
 
-`scan` reads `/etc/os-release` and calls `pacman -Q`, `-Qqe`, and `-Qqm`; it does not alter the package database. It collects package names, versions and install reasons. “Explicit” is a pacman database flag, **not a count of packages you personally installed**: an installer or setup tool may have marked packages explicit. “Foreign” means absent from configured sync databases, not necessarily AUR.
+`scan` reads `/etc/os-release`, calls `pacman -Q`, `-Qqe`, and `-Qqm`, and queries system and user systemd scopes for unit-file and running states. It does not alter the package database or systemd configuration. If a systemd scope is inaccessible, its state is explicitly unknown. It collects package names, versions and install reasons. “Explicit” is a pacman database flag, **not a count of packages you personally installed**: an installer or setup tool may have marked packages explicit. “Foreign” means absent from configured sync databases, not necessarily AUR.
 
 Generated `packages.nix` includes only explicitly installed, non-foreign packages with a curated mapping. Dependencies are not promoted to direct packages; foreign and unmapped packages remain in the report for review. The mapping database currently contains just git, Firefox, Neovim, ripgrep, curl and htop; no claim is made that they exist in a particular target revision until separately validated. Output directories and inventory files must not exist already: existing work is never overwritten.
+
+`services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. Service names and status are included in the inventory and may reveal sensitive information.
 
 ## Optional NixOS baseline
 

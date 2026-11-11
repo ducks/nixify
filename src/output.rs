@@ -1,6 +1,7 @@
 use crate::{
     inventory::Inventory,
     mapping::{self, Decision, Status},
+    service_mapping::{self, ServiceDecision},
 };
 use std::{
     collections::BTreeSet,
@@ -22,6 +23,16 @@ pub fn packages_nix(decisions: &[Decision]) -> String {
     out.push_str("  ];\n}\n");
     out
 }
+pub fn services_nix(decisions: &[ServiceDecision]) -> String {
+    let options: BTreeSet<_> = decisions.iter().filter_map(|d| d.nixos_option).collect();
+    let mut out = String::from("# Migration draft: enablement only; review service configuration and target options.\n{ ... }:\n{\n");
+    for option in options {
+        let _ = writeln!(out, "  {option} = true;");
+    }
+    out.push_str("}\n");
+    out
+}
+
 pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
     let count = |s: Status| decisions.iter().filter(|d| d.status == s).count();
     let explicit = inventory
@@ -43,7 +54,44 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
                 .unwrap_or_default()
         );
     }
-    out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review services, desktop, hardware, networking, filesystems, and boot configuration; this version did not scan them.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Review foreign packages individually; they are not automatically mapped.\n");
+    out.push_str("\n## Services\n\n");
+    if inventory.service_scopes.is_empty() {
+        out.push_str(
+            "Service discovery was not included in this inventory; service state is unknown.\n",
+        );
+    }
+    for scope in &inventory.service_scopes {
+        let _ = writeln!(
+            out,
+            "- {:?} scope: unit files {}, running-state {}.",
+            scope.scope,
+            if scope.unit_files_available {
+                "available"
+            } else {
+                "unavailable"
+            },
+            if scope.runtime_available {
+                "available"
+            } else {
+                "unavailable"
+            }
+        );
+    }
+    for d in service_mapping::decisions(inventory) {
+        let _ = writeln!(
+            out,
+            "- {:?} `{}`: enablement {:?}; running {:?}. {}{}",
+            d.scope,
+            d.service,
+            d.unit_file_state,
+            d.running,
+            d.reason,
+            d.nixos_option
+                .map(|option| format!(" Proposed option: `{option}`."))
+                .unwrap_or_default()
+        );
+    }
+    out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop, hardware, networking, filesystems, and boot configuration are not scanned.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Review foreign packages individually; they are not automatically mapped.\n");
     out
 }
 fn create_file(path: &Path, data: &str) -> io::Result<()> {
@@ -63,11 +111,19 @@ pub fn generate(inventory: &Inventory, dir: &Path) -> Result<(), Box<dyn std::er
     fs::create_dir(dir)?;
     create_file(&dir.join("packages.nix"), &packages_nix(&decisions))?;
     create_file(
+        &dir.join("services.nix"),
+        &services_nix(&service_mapping::decisions(inventory)),
+    )?;
+    create_file(
         &dir.join("migration-report.md"),
         &report(inventory, &decisions),
     )?;
     let mut sorted = inventory.clone();
     sorted.packages.sort_by(|a, b| a.name.cmp(&b.name));
+    sorted.service_scopes.sort_by_key(|s| s.scope);
+    for scope in &mut sorted.service_scopes {
+        scope.services.sort_by(|a, b| a.name.cmp(&b.name));
+    }
     create_file(
         &dir.join("inventory.json"),
         &(serde_json::to_string_pretty(&sorted)? + "\n"),

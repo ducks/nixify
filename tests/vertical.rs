@@ -194,3 +194,66 @@ fn baseline_overlap_does_not_claim_equivalence_or_change_generation() {
     assert!(text.contains("do not prove equivalence"));
     assert!(text.contains("`git`"));
 }
+
+#[test]
+fn systemd_distinguishes_persistent_enablement_and_running_state() {
+    use nixify::{inventory::Scope, service_mapping, systemd};
+    let mut inv = fixture();
+    inv.service_scopes = vec![
+        systemd::from_outputs(Scope::System, Some("sshd.service enabled enabled\nnginx.service disabled disabled\nNetworkManager.service enabled enabled\ncustom.service enabled enabled\n"), Some("nginx.service loaded active running Web server\nsshd.service loaded active running OpenSSH\n")),
+        systemd::from_outputs(Scope::User, Some("caddy.service enabled enabled\n"), None),
+    ];
+    inv.validate().unwrap();
+    let decisions = service_mapping::decisions(&inv);
+    let ssh = decisions
+        .iter()
+        .find(|d| d.service == "sshd.service")
+        .unwrap();
+    assert_eq!(ssh.nixos_option, Some("services.openssh.enable"));
+    assert_eq!(ssh.running, Some(true));
+    let nginx = decisions
+        .iter()
+        .find(|d| d.service == "nginx.service")
+        .unwrap();
+    assert_eq!(nginx.nixos_option, None);
+    assert_eq!(nginx.running, Some(true));
+    let user = decisions
+        .iter()
+        .find(|d| d.service == "caddy.service")
+        .unwrap();
+    assert_eq!(user.nixos_option, None);
+    assert_eq!(user.running, None);
+    let script = output::services_nix(&decisions);
+    assert!(script.contains("services.openssh.enable = true;"));
+    assert!(script.contains("networking.networkmanager.enable = true;"));
+    assert!(!script.contains("services.nginx.enable"));
+    assert!(!script.contains("services.caddy.enable"));
+    let report = output::report(&inv, &mapping::decisions(&inv));
+    assert!(report.contains("custom.service"));
+    assert!(report.contains("runtime;") || report.contains("running-state unavailable"));
+}
+
+#[test]
+fn malformed_or_unavailable_systemd_queries_remain_unknown() {
+    use nixify::{inventory::Scope, systemd};
+    let scope = systemd::from_outputs(
+        Scope::System,
+        Some("invalid extra data"),
+        Some("sshd.service loaded active running SSH"),
+    );
+    assert!(!scope.unit_files_available);
+    assert!(scope.runtime_available);
+    assert_eq!(scope.services[0].unit_file_state, None);
+    assert_eq!(scope.services[0].running, Some(true));
+    let unknown = systemd::from_outputs(Scope::User, None, None);
+    assert!(!unknown.runtime_available && !unknown.unit_files_available);
+}
+
+#[test]
+fn inventory_from_previous_milestone_is_still_readable() {
+    let mut value = serde_json::to_value(fixture()).unwrap();
+    value.as_object_mut().unwrap().remove("service_scopes");
+    let decoded: Inventory = serde_json::from_value(value).unwrap();
+    decoded.validate().unwrap();
+    assert!(decoded.service_scopes.is_empty());
+}
