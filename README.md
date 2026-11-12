@@ -64,4 +64,4 @@ nix build
 nix flake check
 ```
 
-Ordinary tests use synthetic pacman fixtures and need neither Nix nor Manjaro. See [architecture](docs/architecture.md) and [limitations](docs/limitations.md).
+Ordinary tests use synthetic pacman fixtures and need neither Nix nor Manjaro. See [architecture](docs/architecture.md), [limitations](docs/limitations.md), and the [isolated VM smoke test](docs/vm-testing.md).

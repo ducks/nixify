@@ -4,3 +4,5 @@
 /inventory.json
 /baseline.json
 /nixos-migration/
+/.nixify-vm-*/
+__pycache__/
