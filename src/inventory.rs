@@ -12,6 +12,8 @@ pub struct Inventory {
     pub desktop: Option<crate::desktop::DesktopInventory>,
     #[serde(default)]
     pub hardware: Option<crate::hardware::Hardware>,
+    #[serde(default)]
+    pub networking: Option<crate::network::NetworkInventory>,
     pub warnings: Vec<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -171,6 +173,13 @@ impl Inventory {
                         return Err("invalid or sensitive block device evidence".into());
                     }
                 }
+            }
+        }
+        if let Some(network) = &self.networking {
+            if network.firewall_packages.iter().any(|p| {
+                !["firewalld", "ufw", "nftables", "iptables", "iptables-nft"].contains(&p.as_str())
+            }) {
+                return Err("invalid firewall package evidence".into());
             }
         }
         Ok(())

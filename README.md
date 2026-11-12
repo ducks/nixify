@@ -1,6 +1,6 @@
 # nixify
 
-`nixify` is a read-only Linux-to-NixOS migration assistant. The first milestone inventories Manjaro packages and systemd services and produces conservative package and service modules with a review report. It does not install NixOS, modify source configuration, execute service scripts, or partition disks.
+`nixify` is a read-only Linux-to-NixOS migration assistant. The first milestone inventories Manjaro packages, systemd services, desktop signals and limited hardware and networking evidence, then produces conservative modules with a review report. It does not install NixOS, modify source configuration, execute service scripts, or partition disks.
 
 This is **an early migration draft, not a bootable system**. Hardware discovery is partial and full NixOS system evaluation is not implemented yet. Package-attribute checks are available against an explicitly supplied local checkout. The generated flake is intentionally incomplete. Desktop discovery is limited to a small set of recognizable signals. Curated mappings must be verified against your selected Nixpkgs revision.
 
@@ -35,8 +35,8 @@ NixOS version before enabling one.
 Hardware discovery uses `/proc/cpuinfo`, EFI interface presence, `lspci`, and
 `lsblk` for planning evidence. Absence of the EFI interface is reported as
 unknown, not BIOS; loop devices are omitted. No partition, filesystem or boot
-configuration is generated. USB devices, fstab, Wi-Fi and detailed hardware
-configuration are not scanned yet. Review the inventory before sharing it.
+configuration is generated. USB devices, fstab, Wi-Fi settings and detailed hardware
+configuration are not scanned yet. Review the inventory before sharing it. Network inventory records interface-type counts, resolver categories and installed firewall package names; it does not retain interface names, addresses, DNS search domains, hostname or credentials. These summaries can still reveal aspects of your network or security posture.
 
 ## Optional NixOS baseline
 

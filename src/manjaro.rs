@@ -188,7 +188,7 @@ pub fn inventory(
             ],
         })
         .collect();
-    Ok(Inventory { schema_version: 1, source: Source { distribution: id, architecture: architecture.into(), evidence: "/etc/os-release:ID".into() }, packages, service_scopes: Vec::new(), desktop: None, hardware: None, warnings: vec!["Foreign means absent from configured sync databases; it does not establish AUR origin.".into(), "Hardware and network settings require manual migration review.".into()] })
+    Ok(Inventory { schema_version: 1, source: Source { distribution: id, architecture: architecture.into(), evidence: "/etc/os-release:ID".into() }, packages, service_scopes: Vec::new(), desktop: None, hardware: None, networking: None, warnings: vec!["Foreign means absent from configured sync databases; it does not establish AUR origin.".into(), "Hardware and network settings require manual migration review.".into()] })
 }
 pub fn scan(requested: Option<&str>) -> Result<Inventory, ScanError> {
     let os = os_release()?;
@@ -240,5 +240,17 @@ pub fn scan(requested: Option<&str>) -> Result<Inventory, ScanError> {
             .push("Block device inventory unavailable; filesystems require manual review.".into());
     }
     inventory.hardware = Some(hardware);
+    let network = crate::network::scan(&inventory);
+    if network.interfaces.is_none() {
+        inventory
+            .warnings
+            .push("Network interface inventory unavailable; interface evidence is unknown.".into());
+    }
+    if network.dns.is_none() {
+        inventory
+            .warnings
+            .push("Resolver evidence unavailable; DNS configuration is unknown.".into());
+    }
+    inventory.networking = Some(network);
     Ok(inventory)
 }

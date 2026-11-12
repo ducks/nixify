@@ -187,6 +187,46 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
     } else {
         out.push_str("Hardware discovery was not included in this inventory.\n");
     }
+    out.push_str("\n## Networking (planning evidence)\n\n");
+    if let Some(network) = &inventory.networking {
+        match &network.interfaces {
+            Some(i) => {
+                let _ = writeln!(out, "Interface categories: {} loopback, {} wireless, {} Ethernet or virtual, {} other. Names and addresses are omitted.", i.loopback, i.wireless, i.ethernet_or_virtual, i.other);
+            }
+            None => out.push_str("Network interface evidence is unavailable.\n"),
+        }
+        match &network.dns {
+            Some(d) => {
+                let _ = writeln!(out, "Resolver file: {} loopback, {} other and {} unrecognized nameserver entries. Addresses and search domains are omitted; actual DNS in use may differ.", d.loopback_nameservers, d.other_nameservers, d.unrecognized_nameservers);
+            }
+            None => {
+                out.push_str("Resolver file evidence is unavailable or could not be read safely.\n")
+            }
+        }
+        let _ = writeln!(out, "Firewall-related installed packages: {:?}; installed does not establish active firewall rules.", network.firewall_packages);
+    } else {
+        out.push_str("Network discovery was not included in this inventory.\n");
+    }
+    if let Some(scope) = inventory
+        .service_scopes
+        .iter()
+        .find(|s| s.scope == crate::inventory::Scope::System)
+    {
+        for name in ["NetworkManager.service", "systemd-networkd.service"] {
+            if let Some(service) = scope.services.iter().find(|s| s.name == name) {
+                let _ = writeln!(
+                    out,
+                    "- {}: unit-file state {:?}; running state {:?}.",
+                    name, service.unit_file_state, service.running
+                );
+            } else {
+                let _ = writeln!(out, "- {}: not observed; state is unknown.", name);
+            }
+        }
+    } else {
+        out.push_str("Network manager service state is unknown.\n");
+    }
+    out.push_str("Hostname, interface configuration, DNS addresses, VPNs and effective firewall rules require manual review.\n");
     out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop hints do not establish your configured default; verify hardware, networking, filesystems, and boot configuration separately.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Review foreign packages individually; they are not automatically mapped.\n");
     out
 }

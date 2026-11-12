@@ -507,3 +507,52 @@ fn hardware_inventory_rejects_sensitive_mount_paths() {
     });
     assert!(inv.validate().is_err());
 }
+
+#[test]
+fn networking_summarizes_without_retaining_addresses_or_domains() {
+    use nixify::network;
+    let dns = network::parse_resolver("# test\nsearch private.example\nnameserver 127.0.0.53\nnameserver 192.0.2.42\nnameserver fe80::1%secret-interface\nnameserver secret-invalid\n");
+    assert_eq!(dns.loopback_nameservers, 1);
+    assert_eq!(dns.other_nameservers, 2);
+    assert_eq!(dns.unrecognized_nameservers, 1);
+    let json = serde_json::to_string(&dns).unwrap();
+    for secret in [
+        "private.example",
+        "127.0.0.53",
+        "192.0.2.42",
+        "secret-interface",
+        "secret-invalid",
+    ] {
+        assert!(!json.contains(secret));
+    }
+    let root = tempfile::tempdir().unwrap();
+    for (name, kind, wireless) in [
+        ("lo-secret", "772", false),
+        ("wifi-secret", "1", true),
+        ("vpn-secret", "65534", false),
+    ] {
+        let dir = root.path().join(name);
+        fs::create_dir(&dir).unwrap();
+        fs::write(dir.join("type"), kind).unwrap();
+        if wireless {
+            fs::create_dir(dir.join("wireless")).unwrap();
+        }
+    }
+    let summary = network::interface_summary(root.path()).unwrap();
+    assert_eq!(summary.loopback, 1);
+    assert_eq!(summary.wireless, 1);
+    assert_eq!(summary.other, 1);
+    let json = serde_json::to_string(&summary).unwrap();
+    assert!(!json.contains("secret"));
+    fs::write(root.path().join("wifi-secret/type"), "invalid").unwrap();
+    assert!(network::interface_summary(root.path()).is_err());
+}
+
+#[test]
+fn missing_network_field_in_old_inventories_is_supported() {
+    let mut value = serde_json::to_value(fixture()).unwrap();
+    value.as_object_mut().unwrap().remove("networking");
+    let inventory: Inventory = serde_json::from_value(value).unwrap();
+    assert!(inventory.networking.is_none());
+    assert!(inventory.validate().is_ok());
+}
