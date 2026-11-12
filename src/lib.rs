@@ -1,6 +1,7 @@
 pub mod baseline;
 pub mod desktop;
 pub mod draft;
+pub mod hardware;
 pub mod inventory;
 pub mod manjaro;
 pub mod mapping;

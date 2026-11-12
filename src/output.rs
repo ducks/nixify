@@ -50,6 +50,17 @@ pub fn desktop_nix(inventory: &Inventory) -> String {
     out
 }
 
+fn markdown_text(input: &str) -> String {
+    let mut result = String::new();
+    for c in input.chars() {
+        if "\\`*_{}[]()<>#+-.!|".contains(c) {
+            result.push('\\');
+        }
+        result.push(c);
+    }
+    result
+}
+
 pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
     let count = |s: Status| decisions.iter().filter(|d| d.status == s).count();
     let explicit = inventory
@@ -129,7 +140,54 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         let _ = writeln!(out, "Recognized enabled display-manager services: {:?}; confirm their configuration manually.", managers);
     }
     out.push_str("Desktop module options in desktop.nix are commented suggestions only. Verify the target NixOS revision and select the intended desktop and display manager.\n");
-    out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop hints do not establish your configured default; review hardware, networking, filesystems, and boot configuration separately.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Review foreign packages individually; they are not automatically mapped.\n");
+    out.push_str("\n## Hardware and filesystems (planning evidence)\n\n");
+    if let Some(hardware) = &inventory.hardware {
+        let _ = writeln!(
+            out,
+            "CPU model: {}.",
+            hardware
+                .cpu_model
+                .as_deref()
+                .map(markdown_text)
+                .unwrap_or_else(|| "unknown".into())
+        );
+        out.push_str(if hardware.uefi_visible == Some(true) {
+            "UEFI firmware interface is visible; verify the intended boot setup.\n"
+        } else {
+            "Boot mode is unknown; absence of UEFI evidence does not prove BIOS.\n"
+        });
+        out.push_str("Sources: /proc/cpuinfo, /sys/firmware/efi, lspci and lsblk; unavailable evidence is unknown.\n");
+        match &hardware.pci_devices {
+            Some(devices) => {
+                for device in devices {
+                    let _ = writeln!(
+                        out,
+                        "- {}: {} — {}",
+                        device.category,
+                        markdown_text(&device.vendor),
+                        markdown_text(&device.model)
+                    );
+                }
+            }
+            None => out.push_str("PCI device evidence unavailable.\n"),
+        }
+        match &hardware.block_devices {
+            Some(devices) => {
+                for device in devices {
+                    let _ = writeln!(
+                        out,
+                        "- Block device type `{}`: filesystem {:?}, {} bytes, system mounts {:?}.",
+                        device.kind, device.filesystem, device.size_bytes, device.system_mounts
+                    );
+                }
+            }
+            None => out.push_str("Block device evidence unavailable.\n"),
+        }
+        out.push_str("Device identifiers, serial numbers, UUIDs and non-system mount paths are omitted; no disk or filesystem configuration is generated.\n");
+    } else {
+        out.push_str("Hardware discovery was not included in this inventory.\n");
+    }
+    out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop hints do not establish your configured default; verify hardware, networking, filesystems, and boot configuration separately.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Review foreign packages individually; they are not automatically mapped.\n");
     out
 }
 fn create_file(path: &Path, data: &str) -> io::Result<()> {

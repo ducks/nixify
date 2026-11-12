@@ -2,7 +2,7 @@
 
 `nixify` is a read-only Linux-to-NixOS migration assistant. The first milestone inventories Manjaro packages and systemd services and produces conservative package and service modules with a review report. It does not install NixOS, modify source configuration, execute service scripts, or partition disks.
 
-This is **an early migration draft, not a bootable system**. Hardware discovery and full NixOS system evaluation are not implemented yet. Package-attribute checks are available against an explicitly supplied local checkout. The generated flake is intentionally incomplete. Desktop discovery is limited to a small set of recognizable signals. Curated mappings must be verified against your selected Nixpkgs revision.
+This is **an early migration draft, not a bootable system**. Hardware discovery is partial and full NixOS system evaluation is not implemented yet. Package-attribute checks are available against an explicitly supplied local checkout. The generated flake is intentionally incomplete. Desktop discovery is limited to a small set of recognizable signals. Curated mappings must be verified against your selected Nixpkgs revision.
 
 ## Use
 
@@ -32,6 +32,12 @@ selected automatically. Installed packages and available sessions do not prove
 which desktop is configured by default; confirm the options for your target
 NixOS version before enabling one.
 
+Hardware discovery uses `/proc/cpuinfo`, EFI interface presence, `lspci`, and
+`lsblk` for planning evidence. Absence of the EFI interface is reported as
+unknown, not BIOS; loop devices are omitted. No partition, filesystem or boot
+configuration is generated. USB devices, fstab, Wi-Fi and detailed hardware
+configuration are not scanned yet. Review the inventory before sharing it.
+
 ## Optional NixOS baseline
 
 With Nix installed, evaluate a local Nixpkgs checkout (this does not build or activate a system), then compare names:
@@ -45,7 +51,7 @@ For a channel-based installation, the local path may be `/nix/var/nix/profiles/p
 
 ## Privacy
 
-Inventories disclose installed package names, versions, origin flags, architecture and distribution. Treat them as sensitive. The scanner does not read private keys, credentials, home directories, Wi-Fi settings, arbitrary environment variables or service configuration. It reads only `XDG_CURRENT_DESKTOP` and `XDG_SESSION_TYPE` as optional session hints, retaining recognized values only; it checks known session-file paths without reading their contents. Inventory and draft files are created with owner-only permissions on Unix. Review before sharing. A requested Nixpkgs baseline runs `nix-instantiate` on the specified checkout, so only evaluate a source you trust.
+Inventories disclose installed package names, versions, origin flags, architecture and distribution. Treat them as sensitive. The scanner does not read private keys, credentials, home directories, Wi-Fi settings, arbitrary environment variables or service configuration. It reads only `XDG_CURRENT_DESKTOP` and `XDG_SESSION_TYPE` as optional session hints, retaining recognized values only; it checks known session-file paths without reading their contents. Hardware inventory includes CPU model, PCI display/network vendor and model, block-device types, sizes and filesystem types; these can identify your machine. It excludes device names, serials, UUIDs and non-system mount paths. Inventory and draft files are created with owner-only permissions on Unix. Review before sharing. A requested Nixpkgs baseline runs `nix-instantiate` on the specified checkout, so only evaluate a source you trust.
 
 ## Development
 

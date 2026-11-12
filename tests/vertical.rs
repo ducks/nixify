@@ -254,6 +254,7 @@ fn inventory_from_previous_milestone_is_still_readable() {
     let mut value = serde_json::to_value(fixture()).unwrap();
     value.as_object_mut().unwrap().remove("service_scopes");
     value.as_object_mut().unwrap().remove("desktop");
+    value.as_object_mut().unwrap().remove("hardware");
     let decoded: Inventory = serde_json::from_value(value).unwrap();
     decoded.validate().unwrap();
     assert!(decoded.service_scopes.is_empty());
@@ -457,4 +458,52 @@ fn module_evaluation_requires_explicit_nixpkgs_path() {
         .unwrap();
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("--nixpkgs"));
+}
+
+#[test]
+fn hardware_parsers_retain_relevant_evidence_without_identifiers() {
+    use nixify::hardware;
+    let pci = concat!(
+        "00:1f.6 \"Ethernet controller [0200]\" \"Intel [8086]\" \"Ethernet [15b8]\" -r01\n",
+        "01:00.0 \"VGA compatible controller [0300]\" \"NVIDIA [10de]\" \"Graphics [1c03]\"\n",
+        "00:1f.3 \"Audio device [0403]\" \"Vendor [1234]\" \"Audio [4321]\"\n"
+    );
+    let parsed = hardware::parse_pci(pci).unwrap();
+    assert_eq!(parsed.len(), 2);
+    assert_eq!(parsed[0].category, "display");
+    assert_eq!(parsed[1].category, "network");
+    assert!(!serde_json::to_string(&parsed).unwrap().contains("00:1f.6"));
+    assert!(hardware::parse_pci("malformed output").is_err());
+    let blocks = hardware::parse_lsblk(r#"{"blockdevices":[{"type":"part","fstype":"ext4","size":4096,"mountpoints":["/home/private-user","/"],"uuid":"secret-uuid","name":"secret-device"}]}"#).unwrap();
+    assert_eq!(blocks[0].system_mounts, vec!["/"]);
+    let json = serde_json::to_string(&blocks).unwrap();
+    for private in ["private-user", "secret-uuid", "secret-device"] {
+        assert!(!json.contains(private));
+    }
+    assert!(hardware::parse_lsblk("not-json").is_err());
+    let raid = hardware::parse_lsblk(r#"{"blockdevices":[{"type":"raid1","fstype":null,"size":123,"mountpoints":[]},{"type":"loop","fstype":null,"size":2,"mountpoints":[]}]}"#).unwrap();
+    assert_eq!(raid.len(), 1);
+    assert_eq!(raid[0].kind, "raid1");
+    assert_eq!(
+        hardware::parse_cpu("model name : Example CPU\nSerial : confidential\n").as_deref(),
+        Some("Example CPU")
+    );
+}
+
+#[test]
+fn hardware_inventory_rejects_sensitive_mount_paths() {
+    let mut inv = fixture();
+    inv.hardware = Some(nixify::hardware::Hardware {
+        evidence: vec![],
+        cpu_model: None,
+        uefi_visible: None,
+        pci_devices: None,
+        block_devices: Some(vec![nixify::hardware::BlockDevice {
+            kind: "part".into(),
+            filesystem: Some("ext4".into()),
+            size_bytes: 1,
+            system_mounts: vec!["/home/private-user".into()],
+        }]),
+    });
+    assert!(inv.validate().is_err());
 }
