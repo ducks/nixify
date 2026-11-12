@@ -40,6 +40,9 @@ enum Command {
         /// Check generated package names against this local Nixpkgs checkout.
         #[arg(long)]
         nixpkgs: Option<PathBuf>,
+        /// Evaluate trusted project modules with temporary placeholder hardware settings.
+        #[arg(long, requires = "nixpkgs")]
+        evaluate_modules: bool,
     },
     /// Evaluate the default NixOS system packages from a local Nixpkgs checkout.
     Baseline {
@@ -104,7 +107,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             output::generate_with_revision(&inventory, &dir, &revision)?;
             eprintln!("Wrote migration draft to {}", dir.display());
         }
-        Command::Validate { directory, nixpkgs } => {
+        Command::Validate {
+            directory,
+            nixpkgs,
+            evaluate_modules,
+        } => {
             draft::validate_syntax(&directory).map_err(std::io::Error::other)?;
             println!(
                 "Syntax: passed ({} generated Nix files)",
@@ -112,41 +119,65 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             );
             let mut missing = false;
             if let Some(checkout) = nixpkgs {
+                println!("Nixpkgs checkout requested: {}", checkout.display());
                 let inventory = read_inventory(&directory.join("inventory.json"))?;
-                let checked = draft::check_attributes(&directory, &inventory, &checkout)
-                    .map_err(std::io::Error::other)?;
-                println!("Nixpkgs checkout: {}", checked.checkout.display());
-                println!("Target pinned revision: {}", checked.target_revision);
-                match checked.revision_evidence {
-                    draft::RevisionEvidence::DeclaredMatch => println!("Revision: checkout .git-revision matches the target pin (self-reported metadata; content not authenticated)"),
-                    draft::RevisionEvidence::DeclaredMismatch(rev) => println!("Revision: checkout declares {rev}; it differs from the target pin, so the target revision is not validated"),
-                    draft::RevisionEvidence::Unavailable => println!("Revision: checkout revision unavailable; target pin is not validated"),
-                }
-                if checked.attributes.is_empty() {
-                    println!("Package attributes: none selected");
-                }
-                for (attribute, exists) in &checked.attributes {
-                    println!(
-                        "Package attribute {attribute}: {}",
-                        if *exists {
-                            "exists in supplied checkout"
-                        } else {
-                            "missing in supplied checkout"
+                match draft::expected_attributes(&directory, &inventory) {
+                    Ok(_) => {
+                        let checked = draft::check_attributes(&directory, &inventory, &checkout)
+                            .map_err(std::io::Error::other)?;
+                        println!("Nixpkgs checkout: {}", checked.checkout.display());
+                        println!("Target pinned revision: {}", checked.target_revision);
+                        match checked.revision_evidence {
+                            draft::RevisionEvidence::DeclaredMatch => println!("Revision: checkout .git-revision matches the target pin (self-reported metadata; content not authenticated)"),
+                            draft::RevisionEvidence::DeclaredMismatch(rev) => println!("Revision: checkout declares {rev}; it differs from the target pin, so the target revision is not validated"),
+                            draft::RevisionEvidence::Unavailable => println!("Revision: checkout revision unavailable; target pin is not validated"),
                         }
-                    );
-                    missing |= !exists;
+                        if checked.attributes.is_empty() {
+                            println!("Package attributes: none selected");
+                        }
+                        for (attribute, exists) in &checked.attributes {
+                            println!(
+                                "Package attribute {attribute}: {}",
+                                if *exists {
+                                    "exists in supplied checkout"
+                                } else {
+                                    "missing in supplied checkout"
+                                }
+                            );
+                            missing |= !exists;
+                        }
+                    }
+                    Err(reason) => {
+                        println!("Package attributes: not checked ({reason})");
+                        println!("Revision: generated target pin was not verified");
+                    }
+                }
+                if evaluate_modules {
+                    let evaluated = draft::evaluate_modules(&directory, &checkout, &inventory)
+                        .map_err(std::io::Error::other)?;
+                    println!("NixOS module evaluation: selected options and {} system packages evaluated using temporary placeholder hardware (stateVersion {})", evaluated.system_package_count, evaluated.state_version);
+                    if evaluated.failed_assertions.is_empty() {
+                        println!("Evaluated NixOS assertions: passed");
+                    } else {
+                        for message in &evaluated.failed_assertions {
+                            println!("Failed NixOS assertion: {message}");
+                        }
+                        missing = true;
+                    }
+                    println!("Module evaluation is partial; it does not prove target-revision, hardware, service or boot compatibility.");
+                } else {
+                    println!("NixOS module evaluation: not checked");
                 }
             } else {
-                println!("Nixpkgs attributes: not checked");
+                println!("Nixpkgs attributes: not checked\nNixOS module evaluation: not checked");
             }
-            println!("NixOS module evaluation: not checked\nSystem build: not checked\nBoot and services: not checked");
+            println!("System build: not checked\nBoot and services: not checked");
             println!("This is an incomplete migration draft; passing these checks does not make it installable.");
             if missing {
-                return Err(
-                    "one or more package attributes are missing from the supplied checkout".into(),
-                );
+                return Err("attribute checks or evaluated NixOS assertions failed".into());
             }
         }
+
         Command::Baseline { nixpkgs, output } => {
             let data = serde_json::to_string_pretty(&baseline::evaluate(&nixpkgs)?)? + "\n";
             if let Some(path) = output {

@@ -253,3 +253,89 @@ mod tests {
         );
     }
 }
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModuleEvaluation {
+    pub state_version: String,
+    pub system_package_count: usize,
+    pub failed_assertions: Vec<String>,
+}
+
+// This evaluates the supplied project; users must explicitly opt in and trust it.
+// The dummy options allow evaluating an incomplete draft but are never written
+// to the project and do not describe the source machine's actual hardware.
+const MODULE_EXPRESSION: &str = r#"{ nixpkgsPath, projectPath, system }:
+let
+  nixpkgs = builtins.toPath nixpkgsPath;
+  project = builtins.toPath projectPath;
+  evaluated = import (nixpkgs + "/nixos/lib/eval-config.nix") {
+    inherit system;
+    modules = [ (project + "/configuration.nix") ({ lib, ... }: {
+      system.stateVersion = lib.mkDefault "24.11";
+      boot.loader.grub.devices = lib.mkDefault [ "nodev" ];
+      fileSystems."/" = { device = lib.mkDefault "/dev/null"; fsType = lib.mkDefault "ext4"; };
+    }) ];
+  };
+  cfg = evaluated.config;
+  packageNames = map (pkg: pkg.name) cfg.environment.systemPackages;
+  failed = map (assertion: assertion.message) (builtins.filter (assertion: !assertion.assertion) cfg.assertions);
+in builtins.deepSeq packageNames {
+  state_version = cfg.system.stateVersion;
+  system_package_count = builtins.length packageNames;
+  failed_assertions = failed;
+}
+"#;
+
+pub fn evaluate_modules(
+    dir: &Path,
+    nixpkgs: &Path,
+    inventory: &crate::inventory::Inventory,
+) -> Result<ModuleEvaluation, String> {
+    evaluate_modules_with(dir, nixpkgs, inventory, |args| {
+        crate::manjaro::run_bounded("nix-instantiate", args, false).map_err(|e| e.to_string())
+    })
+}
+
+pub fn evaluate_modules_with<F>(
+    dir: &Path,
+    nixpkgs: &Path,
+    inventory: &crate::inventory::Inventory,
+    run: F,
+) -> Result<ModuleEvaluation, String>
+where
+    F: FnOnce(&[&str]) -> Result<String, String>,
+{
+    inventory.validate()?;
+    let project =
+        fs::canonicalize(dir).map_err(|e| format!("cannot access project directory: {e}"))?;
+    let checkout =
+        fs::canonicalize(nixpkgs).map_err(|e| format!("cannot access Nixpkgs checkout: {e}"))?;
+    let project_path = project.to_str().ok_or("project path must be valid UTF-8")?;
+    let nixpkgs_path = checkout
+        .to_str()
+        .ok_or("Nixpkgs path must be valid UTF-8")?;
+    let system = match inventory.source.architecture.as_str() {
+        "x86_64" => "x86_64-linux",
+        "aarch64" => "aarch64-linux",
+        _ => return Err("unsupported target architecture".into()),
+    };
+    let json = run(&[
+        "--eval",
+        "--strict",
+        "--json",
+        "-E",
+        MODULE_EXPRESSION,
+        "--argstr",
+        "nixpkgsPath",
+        nixpkgs_path,
+        "--argstr",
+        "projectPath",
+        project_path,
+        "--argstr",
+        "system",
+        system,
+    ])
+    .map_err(|e| format!("module evaluation failed: {e}"))?;
+    serde_json::from_str(&json).map_err(|e| format!("invalid module evaluation result: {e}"))
+}
