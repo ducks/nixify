@@ -28,6 +28,31 @@ fn curated(name: &str) -> Option<&'static str> {
         "ripgrep" => Some("ripgrep"),
         "curl" => Some("curl"),
         "htop" => Some("htop"),
+        "alacritty" => Some("alacritty"),
+        "bat" => Some("bat"),
+        "btop" => Some("btop"),
+        "fd" => Some("fd"),
+        "ffmpeg" => Some("ffmpeg"),
+        "fish" => Some("fish"),
+        "fzf" => Some("fzf"),
+        "gcc" => Some("gcc"),
+        "jq" => Some("jq"),
+        "kitty" => Some("kitty"),
+        "less" => Some("less"),
+        "make" => Some("gnumake"),
+        "nano" => Some("nano"),
+        "nmap" => Some("nmap"),
+        "openssh" => Some("openssh"),
+        "rsync" => Some("rsync"),
+        "shellcheck" => Some("shellcheck"),
+        "tmux" => Some("tmux"),
+        "tree" => Some("tree"),
+        "unzip" => Some("unzip"),
+        "vlc" => Some("vlc"),
+        "wget" => Some("wget"),
+        "which" => Some("which"),
+        "xclip" => Some("xclip"),
+        "zsh" => Some("zsh"),
         _ => None,
     }
 }
@@ -50,7 +75,7 @@ pub fn decision(package: &Package) -> Decision {
         (
             Status::Mapped,
             Some(attr.to_owned()),
-            "Curated mapping; availability in the target Nixpkgs revision has not been validated.",
+            "Curated package mapping; target-revision availability, configuration and behavior are not yet verified.",
         )
     } else {
         (

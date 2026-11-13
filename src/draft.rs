@@ -142,15 +142,32 @@ pub fn expected_attributes(
     let decisions = crate::mapping::reviewed_decisions(inventory, &review, Some(&revision))?;
     let package_text = fs::read_to_string(dir.join("packages.nix"))
         .map_err(|e| format!("cannot read packages.nix: {e}"))?;
-    let is_legacy = review.mappings.is_empty()
-        && package_text == crate::output::legacy_packages_nix(&decisions);
-    if package_text != crate::output::packages_nix(&decisions) && !is_legacy {
+    // Drafts created before the curated list expanded must stay verifiable.
+    // Reconstruct the original six-entry mapping rather than interpreting Nix.
+    let mut original_decisions = crate::mapping::decisions(inventory);
+    for decision in &mut original_decisions {
+        if decision.status == crate::mapping::Status::Mapped
+            && !["git", "firefox", "neovim", "ripgrep", "curl", "htop"]
+                .contains(&decision.package.as_str())
+        {
+            decision.nixpkgs_attribute = None;
+        }
+    }
+    let prior_six = review.mappings.is_empty()
+        && (package_text == crate::output::legacy_packages_nix(&original_decisions)
+            || package_text == crate::output::packages_nix(&original_decisions));
+    if package_text != crate::output::packages_nix(&decisions) && !prior_six {
         return Err(
             "packages.nix or inventory was edited; cannot reliably enumerate referenced attributes"
                 .into(),
         );
     }
-    let attrs = decisions
+    let checked_decisions = if prior_six {
+        original_decisions
+    } else {
+        decisions
+    };
+    let attrs = checked_decisions
         .into_iter()
         .filter_map(|d| d.nixpkgs_attribute)
         .collect::<std::collections::BTreeSet<_>>()

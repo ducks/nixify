@@ -704,3 +704,49 @@ fn validation_accepts_legacy_generated_package_module() {
         vec!["git", "neovim"]
     );
 }
+
+#[test]
+fn curated_mappings_handle_different_names_without_promoting_dependencies_or_foreign_packages() {
+    use nixify::inventory::Package;
+    let package = |name: &str, explicit: bool, foreign: bool| Package {
+        name: name.into(),
+        version: "1".into(),
+        explicitly_installed: explicit,
+        foreign,
+        evidence: vec![],
+    };
+    let make = mapping::decision(&package("make", true, false));
+    assert_eq!(make.nixpkgs_attribute.as_deref(), Some("gnumake"));
+    assert_eq!(
+        mapping::decision(&package("tmux", false, false)).status,
+        Status::Dependency
+    );
+    assert_eq!(
+        mapping::decision(&package("tmux", true, true)).status,
+        Status::Review
+    );
+    assert_eq!(
+        mapping::decision(&package("unrecognized-package", true, false)).status,
+        Status::Unmapped
+    );
+}
+
+#[test]
+fn old_drafts_remain_verifiable_after_curated_mappings_expand() {
+    use nixify::inventory::Package;
+    let mut inv = fixture();
+    inv.packages.push(Package {
+        name: "tmux".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    output::generate(&inv, &dir).unwrap();
+    let legacy = "# Migration draft. Curated mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n    git\n    neovim\n  ];\n}\n";
+    fs::write(dir.join("packages.nix"), legacy).unwrap();
+    let (_, attrs) = nixify::draft::expected_attributes(&dir, &inv).unwrap();
+    assert_eq!(attrs, vec!["git", "neovim"]);
+}
