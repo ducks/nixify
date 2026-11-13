@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use nixify::{baseline, draft, inventory::Inventory, manjaro, mapping, output};
+use nixify::{baseline, draft, inventory::Inventory, manjaro, mapping, output, suggest};
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
@@ -33,6 +33,9 @@ enum Command {
         /// Full pinned Nixpkgs Git revision (defaults to nixify's locked revision).
         #[arg(long)]
         nixpkgs_rev: Option<String>,
+        /// Explicitly reviewed mappings in JSON; never inferred automatically.
+        #[arg(long)]
+        reviewed_mappings: Option<PathBuf>,
     },
     /// Check Nix syntax without resolving inputs, building, or activating.
     Validate {
@@ -51,6 +54,15 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Look up unreviewed exact-name candidates in a trusted local Nixpkgs checkout.
+    Suggest {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        nixpkgs: PathBuf,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Explain curated mapping coverage and unresolved packages.
     Report {
         #[arg(long)]
@@ -58,6 +70,9 @@ enum Command {
         /// Optional name-only comparison against an evaluated NixOS baseline.
         #[arg(long)]
         baseline: Option<PathBuf>,
+        /// Include explicit user-reviewed mappings in the coverage report.
+        #[arg(long)]
+        reviewed_mappings: Option<PathBuf>,
     },
 }
 fn read_inventory(path: &Path) -> Result<Inventory, Box<dyn std::error::Error>> {
@@ -98,13 +113,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             input,
             output: dir,
             nixpkgs_rev,
+            reviewed_mappings,
         } => {
             let inventory = read_inventory(&input)?;
             let revision = match nixpkgs_rev {
                 Some(revision) => revision,
                 None => draft::default_revision().map_err(std::io::Error::other)?,
             };
-            output::generate_with_revision(&inventory, &dir, &revision)?;
+            let reviewed = match reviewed_mappings {
+                Some(path) => mapping::read_reviewed(&path).map_err(std::io::Error::other)?,
+                None => mapping::ReviewedMappings::empty(),
+            };
+            output::generate_with_review(&inventory, &dir, &revision, &reviewed)?;
             eprintln!("Wrote migration draft to {}", dir.display());
         }
         Command::Validate {
@@ -192,15 +212,51 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 print!("{data}");
             }
         }
+        Command::Suggest {
+            input,
+            nixpkgs,
+            output,
+        } => {
+            let inventory = read_inventory(&input)?;
+            let report = suggest::evaluate(&inventory, &nixpkgs).map_err(std::io::Error::other)?;
+            let found = report
+                .suggestions
+                .iter()
+                .filter(|s| s.attribute_exists)
+                .count();
+            let data = serde_json::to_string_pretty(&report)? + "\n";
+            if let Some(path) = output {
+                #[cfg(unix)]
+                use std::os::unix::fs::OpenOptionsExt;
+                let mut options = OpenOptions::new();
+                options.write(true).create_new(true);
+                #[cfg(unix)]
+                options.mode(0o600);
+                options.open(&path)?.write_all(data.as_bytes())?;
+                eprintln!(
+                    "Checked {} names ({} exact-name attributes exist; {} names require review) and wrote {}",
+                    report.suggestions.len(),
+                    found,
+                    report.suggestions.len(),
+                    path.display()
+                );
+            } else {
+                print!("{data}");
+            }
+        }
         Command::Report {
             input,
             baseline: baseline_path,
+            reviewed_mappings,
         } => {
             let inventory = read_inventory(&input)?;
-            print!(
-                "{}",
-                output::report(&inventory, &mapping::decisions(&inventory))
-            );
+            let reviewed = match reviewed_mappings {
+                Some(path) => mapping::read_reviewed(&path).map_err(std::io::Error::other)?,
+                None => mapping::ReviewedMappings::empty(),
+            };
+            let decisions = mapping::reviewed_decisions(&inventory, &reviewed, None)
+                .map_err(std::io::Error::other)?;
+            print!("{}", output::report(&inventory, &decisions));
             if let Some(path) = baseline_path {
                 let mut bytes = Vec::new();
                 File::open(path)?

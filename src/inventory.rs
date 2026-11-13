@@ -75,6 +75,16 @@ impl Inventory {
                 self.source.distribution
             ));
         }
+        if self.source.architecture.is_empty()
+            || self.source.architecture.len() > 64
+            || !self
+                .source
+                .architecture
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"_-+".contains(&b))
+        {
+            return Err("invalid source architecture".into());
+        }
         let mut seen = std::collections::BTreeSet::new();
         for package in &self.packages {
             if !valid_package_name(&package.name)

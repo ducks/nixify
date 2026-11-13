@@ -120,7 +120,7 @@ fn cli_generates_and_reports_without_nix() {
         String::from_utf8_lossy(&status.stderr)
     );
     let text = fs::read_to_string(target.join("packages.nix")).unwrap();
-    assert!(text.contains("    git\n"));
+    assert!(text.contains("    pkgs.\"git\"\n"));
     assert!(!text.contains("foreign-tool"));
     let report = Command::new(binary)
         .args(["report", "--input", file.to_str().unwrap()])
@@ -171,7 +171,7 @@ fn baseline_overlap_does_not_claim_equivalence_or_change_generation() {
     };
     assert_eq!(baseline::matches(&inventory, &baseline), vec!["git"]);
     let before = output::packages_nix(&mapping::decisions(&inventory));
-    assert!(before.contains("    git\n"));
+    assert!(before.contains("    pkgs.\"git\"\n"));
     let temp = tempfile::tempdir().unwrap();
     let inv_path = temp.path().join("inventory.json");
     let baseline_path = temp.path().join("baseline.json");
@@ -555,4 +555,152 @@ fn missing_network_field_in_old_inventories_is_supported() {
     let inventory: Inventory = serde_json::from_value(value).unwrap();
     assert!(inventory.networking.is_none());
     assert!(inventory.validate().is_ok());
+}
+
+#[test]
+fn suggestions_are_unreviewed_and_preserve_foreign_status() {
+    use std::collections::BTreeMap;
+    let inventory = fixture();
+    let results = BTreeMap::from([
+        ("base-devel".to_string(), false),
+        ("foreign-tool".to_string(), true),
+    ]);
+    let report = nixify::suggest::report_from_results(
+        &inventory,
+        std::path::Path::new("/nixpkgs"),
+        None,
+        "x86_64-linux",
+        results,
+    )
+    .unwrap();
+    assert_eq!(report.suggestions.len(), 2);
+    let foreign = report
+        .suggestions
+        .iter()
+        .find(|x| x.source_package == "foreign-tool")
+        .unwrap();
+    assert!(foreign.foreign && foreign.attribute_exists);
+    assert_eq!(foreign.classification, "unreviewed_exact_name_match");
+    assert!(report.warning.contains("No mappings were accepted"));
+    assert!(nixify::suggest::report_from_results(
+        &inventory,
+        std::path::Path::new("/nixpkgs"),
+        None,
+        "x86_64-linux",
+        BTreeMap::new()
+    )
+    .is_err());
+}
+
+#[test]
+fn reviewed_mapping_is_explicit_safe_and_revalidated() {
+    use nixify::mapping::{ReviewedMapping, ReviewedMappings};
+    let inventory = fixture();
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    let review = ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: Some(revision.into()),
+        mappings: vec![ReviewedMapping {
+            source_package: "foreign-tool".into(),
+            nixpkgs_attribute: "htop".into(),
+        }],
+    };
+    let decisions = mapping::reviewed_decisions(&inventory, &review, Some(revision)).unwrap();
+    assert_eq!(
+        decisions
+            .iter()
+            .find(|d| d.package == "foreign-tool")
+            .unwrap()
+            .status,
+        Status::Reviewed
+    );
+    output::generate_with_review(&inventory, &dir, revision, &review).unwrap();
+    let module = fs::read_to_string(dir.join("packages.nix")).unwrap();
+    assert!(module.contains("pkgs.\"htop\""));
+    assert!(dir.join("reviewed-mappings.json").exists());
+    let (_, attrs) = nixify::draft::expected_attributes(&dir, &inventory).unwrap();
+    assert!(attrs.contains(&"htop".into()));
+    assert!(fs::read_to_string(dir.join("migration-report.md"))
+        .unwrap()
+        .contains("User-reviewed mapping"));
+}
+
+#[test]
+fn reviewed_mappings_reject_injection_duplicates_dependencies_and_wrong_revision() {
+    use nixify::mapping::{ReviewedMapping, ReviewedMappings};
+    let inventory = fixture();
+    let item = |source: &str, attr: &str| ReviewedMapping {
+        source_package: source.into(),
+        nixpkgs_attribute: attr.into(),
+    };
+    let check = |mappings, revision: Option<&str>| ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: revision.map(str::to_owned),
+        mappings,
+    };
+    let target = "0123456789abcdef0123456789abcdef01234567";
+    for review in [
+        check(vec![item("git", "x\"; builtins.abort \"bad")], None),
+        check(vec![item("git", "htop"), item("git", "git")], None),
+        check(vec![item("libexample", "htop")], None),
+        check(vec![item("missing", "htop")], None),
+        check(
+            vec![item("git", "htop")],
+            Some("ffffffffffffffffffffffffffffffffffffffff"),
+        ),
+    ] {
+        assert!(mapping::reviewed_decisions(&inventory, &review, Some(target)).is_err());
+    }
+}
+
+#[test]
+fn cli_generate_accepts_only_explicitly_reviewed_mappings() {
+    let temp = tempfile::tempdir().unwrap();
+    let inventory = fixture();
+    let input = temp.path().join("inventory.json");
+    let review = temp.path().join("review.json");
+    let dir = temp.path().join("draft");
+    fs::write(&input, serde_json::to_vec(&inventory).unwrap()).unwrap();
+    fs::write(&review, r#"{"schema_version":1,"mappings":[{"source_package":"foreign-tool","nixpkgs_attribute":"htop"}]}"#).unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args([
+            "generate",
+            "--input",
+            input.to_str().unwrap(),
+            "--output",
+            dir.to_str().unwrap(),
+            "--reviewed-mappings",
+            review.to_str().unwrap(),
+        ])
+        .env("PATH", "")
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(fs::read_to_string(dir.join("packages.nix"))
+        .unwrap()
+        .contains("pkgs.\"htop\""));
+    assert!(nixify::draft::expected_attributes(&dir, &inventory)
+        .unwrap()
+        .1
+        .contains(&"htop".into()));
+}
+
+#[test]
+fn validation_accepts_legacy_generated_package_module() {
+    let inv = fixture();
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("draft");
+    output::generate(&inv, &dir).unwrap();
+    let legacy = "# Migration draft. Curated mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n    git\n    neovim\n  ];\n}\n";
+    fs::write(dir.join("packages.nix"), legacy).unwrap();
+    assert_eq!(
+        nixify::draft::expected_attributes(&dir, &inv).unwrap().1,
+        vec!["git", "neovim"]
+    );
 }

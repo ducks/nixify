@@ -17,7 +17,7 @@ nixify validate ./nixos-migration
 
 `scan` reads `/etc/os-release`, calls `pacman -Q`, `-Qqe`, and `-Qqm`, and queries system and user systemd scopes for unit-file and running states. It does not alter the package database or systemd configuration. If a systemd scope is inaccessible, its state is explicitly unknown. It collects package names, versions and install reasons. “Explicit” is a pacman database flag, **not a count of packages you personally installed**: an installer or setup tool may have marked packages explicit. “Foreign” means absent from configured sync databases, not necessarily AUR.
 
-Generated `packages.nix` includes only explicitly installed, non-foreign packages with a curated mapping. Dependencies are not promoted to direct packages; foreign and unmapped packages remain in the report for review. The mapping database currently contains just git, Firefox, Neovim, ripgrep, curl and htop; no claim is made that they exist in a particular target revision until separately validated. Output directories and inventory files must not exist already: existing work is never overwritten.
+Generated `packages.nix` includes explicitly installed, non-foreign packages with a curated mapping, plus any mappings explicitly supplied in a reviewed mappings file. Dependencies are not promoted to direct packages; foreign and unmapped packages remain in the report unless individually reviewed. The mapping database currently contains just git, Firefox, Neovim, ripgrep, curl and htop; no claim is made that they exist in a particular target revision until separately validated. Output directories and inventory files must not exist already: existing work is never overwritten.
 
 `services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. Service names and status are included in the inventory and may reveal sensitive information.
 
@@ -37,6 +37,30 @@ Hardware discovery uses `/proc/cpuinfo`, EFI interface presence, `lspci`, and
 unknown, not BIOS; loop devices are omitted. No partition, filesystem or boot
 configuration is generated. USB devices, fstab, Wi-Fi settings and detailed hardware
 configuration are not scanned yet. Review the inventory before sharing it. Network inventory records interface-type counts, resolver categories and installed firewall package names; it does not retain interface names, addresses, DNS search domains, hostname or credentials. These summaries can still reveal aspects of your network or security posture.
+
+## Review more package mappings
+
+An optional lookup checks unresolved explicit package names against a trusted local Nixpkgs checkout:
+
+```sh
+nixify suggest --input inventory.json --nixpkgs /path/to/nixpkgs --output suggestions.json
+```
+
+An exact-name attribute is only a **candidate**: its existence does not establish that it is installable, related, or equivalent. The lookup never changes the generated configuration and includes foreign packages without assuming they came from AUR. It assumes the source architecture for the target and reports the checkout's self-declared revision. Only evaluate trusted Nixpkgs code.
+
+After checking individual packages yourself, create a review file. This example is illustrative; `nixpkgs_revision` may be omitted or set to a full commit hash:
+
+```json
+{
+  "schema_version": 1,
+  "nixpkgs_revision": null,
+  "mappings": [
+    {"source_package": "git", "nixpkgs_attribute": "git"}
+  ]
+}
+```
+
+Pass it explicitly to `nixify report --input inventory.json --reviewed-mappings review.json` or `nixify generate --input inventory.json --output ./nixos-migration --reviewed-mappings review.json`. Each source must be explicitly installed; foreign packages can be added only by explicit review. Attribute values are single top-level names, not arbitrary Nix expressions. If the review declares a revision, it must match the generated flake pin. The report labels these as user-reviewed, not automatically verified; use `validate --nixpkgs` to check attribute existence. Review files and suggestions disclose installed software and should be protected like inventories.
 
 ## Optional NixOS baseline
 

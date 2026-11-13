@@ -128,10 +128,23 @@ pub fn expected_attributes(
     if flake(&inventory.source.architecture, &revision)? != flake_text {
         return Err("flake.nix was edited; target pin cannot be verified by this check".into());
     }
-    let decisions = crate::mapping::decisions(inventory);
+    let review_path = dir.join("reviewed-mappings.json");
+    let review = match fs::symlink_metadata(&review_path) {
+        Ok(metadata) if metadata.file_type().is_file() => {
+            crate::mapping::read_reviewed(&review_path)?
+        }
+        Ok(_) => return Err("reviewed-mappings.json must be a regular non-symlink file".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            crate::mapping::ReviewedMappings::empty()
+        }
+        Err(error) => return Err(format!("cannot inspect reviewed mappings: {error}")),
+    };
+    let decisions = crate::mapping::reviewed_decisions(inventory, &review, Some(&revision))?;
     let package_text = fs::read_to_string(dir.join("packages.nix"))
         .map_err(|e| format!("cannot read packages.nix: {e}"))?;
-    if package_text != crate::output::packages_nix(&decisions) {
+    let is_legacy = review.mappings.is_empty()
+        && package_text == crate::output::legacy_packages_nix(&decisions);
+    if package_text != crate::output::packages_nix(&decisions) && !is_legacy {
         return Err(
             "packages.nix or inventory was edited; cannot reliably enumerate referenced attributes"
                 .into(),

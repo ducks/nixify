@@ -6,3 +6,5 @@
 /nixos-migration/
 /.nixify-vm-*/
 __pycache__/
+/suggestions.json
+/review.json

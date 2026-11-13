@@ -17,6 +17,19 @@ pub fn packages_nix(decisions: &[Decision]) -> String {
         .iter()
         .filter_map(|d| d.nixpkgs_attribute.as_deref())
         .collect();
+    let mut out = String::from("# Migration draft. Package mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n");
+    for attr in attrs {
+        let _ = writeln!(out, "    pkgs.\"{attr}\"");
+    }
+    out.push_str("  ];\n}\n");
+    out
+}
+// Recognize pre-reviewed-mapping drafts without interpreting arbitrary Nix.
+pub(crate) fn legacy_packages_nix(decisions: &[Decision]) -> String {
+    let attrs: BTreeSet<_> = decisions
+        .iter()
+        .filter_map(|d| d.nixpkgs_attribute.as_deref())
+        .collect();
     let mut out = String::from("# Migration draft. Curated mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n");
     for attr in attrs {
         let _ = writeln!(out, "    {attr}");
@@ -68,7 +81,7 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         .iter()
         .filter(|p| p.explicitly_installed)
         .count();
-    let mut out = format!("# nixify migration report\n\nSource: Manjaro Linux ({})\n\n## Packages\n\n- Explicitly installed: {explicit}\n- Curated mappings (not revision-validated): {}\n- Require review: {}\n- No mapping: {}\n- Dependency-installed, not selected: {}\n\n", inventory.source.architecture, count(Status::Mapped), count(Status::Review), count(Status::Unmapped), count(Status::Dependency));
+    let mut out = format!("# nixify migration report\n\nSource: Manjaro Linux ({})\n\n## Packages\n\n- Explicitly installed: {explicit}\n- Curated mappings (not revision-validated): {}\n- User-reviewed mappings (not automatically verified): {}\n- Require review: {}\n- No mapping: {}\n- Dependency-installed, not selected: {}\n\n", inventory.source.architecture, count(Status::Mapped), count(Status::Reviewed), count(Status::Review), count(Status::Unmapped), count(Status::Dependency));
     out.push_str("## Package decisions\n\n");
     for d in decisions.iter().filter(|d| d.status != Status::Dependency) {
         let _ = writeln!(
@@ -249,11 +262,25 @@ pub fn generate_with_revision(
     dir: &Path,
     revision: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_review(
+        inventory,
+        dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+    )
+}
+pub fn generate_with_review(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+) -> Result<(), Box<dyn std::error::Error>> {
     inventory.validate().map_err(io::Error::other)?;
     let flake =
         crate::draft::flake(&inventory.source.architecture, revision).map_err(io::Error::other)?;
     let revision = crate::draft::normalize_revision(revision).map_err(io::Error::other)?;
-    let decisions = mapping::decisions(inventory);
+    let decisions = mapping::reviewed_decisions(inventory, review, Some(&revision))
+        .map_err(io::Error::other)?;
     // Never overwrite a previous output, including partially generated drafts.
     fs::create_dir(dir)?;
     create_file(&dir.join("flake.nix"), &flake)?;
@@ -267,6 +294,16 @@ pub fn generate_with_revision(
         &services_nix(&service_mapping::decisions(inventory)),
     )?;
     create_file(&dir.join("desktop.nix"), &desktop_nix(inventory))?;
+    if !review.mappings.is_empty() {
+        let mut review = review.clone();
+        review
+            .mappings
+            .sort_by(|a, b| a.source_package.cmp(&b.source_package));
+        create_file(
+            &dir.join("reviewed-mappings.json"),
+            &(serde_json::to_string_pretty(&review)? + "\n"),
+        )?;
+    }
     create_file(
         &dir.join("migration-report.md"),
         &format!("{}\n## Target draft\n\n- Nixpkgs revision: `{}` (not yet resolved or validated).\n- No flake.lock was generated.\n- Supply reviewed hardware, boot, filesystems, users, networking and system.stateVersion before use.\n", report(inventory, &decisions), revision),
