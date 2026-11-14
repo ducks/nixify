@@ -19,3 +19,18 @@ Lookups are limited to 30 names by default; use `--limit` (maximum 50) and `--of
 Check the original package and target Nixpkgs attribute against their upstream sources, including any differences in functionality, licensing and platform support. Check that the target attribute is a derivation on the relevant Nixpkgs revision. Propose a reviewed entry in `mappings/manjaro.json`, with the actual revision, and explain the source and equivalence evidence in the pull request. A registry name or description alone is not sufficient. Entries that need manual configuration should say so; ambiguous cases should remain manual review. Never include an unredacted personal inventory in a public contribution.
 
 Run `cargo fmt --all -- --check`, `cargo test --locked`, `cargo clippy --all-targets --locked -- -D warnings`, and `python3 -m unittest discover -s tests -p 'test_enrich_candidates.py' -v`. Run `nix flake check` where Nix is available.
+
+## Maintainer bulk candidate generation
+
+`scripts/generate_mapping_candidates.py` creates a distribution-wide review queue without users submitting inventories. Download a snapshot of the [AUR metadata archive](https://wiki.archlinux.org/title/Aurweb_RPC_interface#AUR_metadata_archives), or a Debian/Ubuntu `Packages` index, and independently obtain `nix search --json` output from a pinned Nixpkgs revision. Supply the full revision explicitly. This tool reads local files only and records input hashes; it does not authenticate those files or the revision.
+
+```sh
+python3 scripts/generate_mapping_candidates.py \
+  --registry aur --source packages-meta-v1.json.gz \
+  --nix-search nix-search.json --nixpkgs-revision FULL_40_CHARACTER_COMMIT \
+  --output aur-candidates.json
+```
+
+AUR defaults to the 1,000 packages with the highest AUR popularity score. This is not a download count. For Debian and Ubuntu, provide `--ranking ranked-packages.txt`, one package name per line in descending priority order. Debian's opt-in [popularity contest](https://popcon.debian.org/) is a possible source of installed-package counts; it is not a complete or representative download count. No Ubuntu ranking source is supplied or inferred. Record the source and date of any ranking when publishing results. Use `--limit` to adjust the number of unique packages considered.
+
+Unmatched packages remain in the review queue, and exact-name matches are unreviewed. This script does not populate the runtime mapping database; source/target equivalence and the selected revision still need verification before a mapping is contributed. Users can recommend missing packages through project issues or pull requests. Debian and Ubuntu indexes are supported by the maintainer script, but nixify does not yet scan those distributions.
