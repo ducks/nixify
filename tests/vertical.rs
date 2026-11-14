@@ -750,3 +750,26 @@ fn old_drafts_remain_verifiable_after_curated_mappings_expand() {
     let (_, attrs) = nixify::draft::expected_attributes(&dir, &inv).unwrap();
     assert_eq!(attrs, vec!["git", "neovim"]);
 }
+
+#[test]
+fn distribution_mapping_database_requires_safe_unique_evidenced_entries() {
+    let source = include_str!("../mappings/manjaro.json");
+    let original: serde_json::Value = serde_json::from_str(source).unwrap();
+    let db = mapping::parse_database(source).unwrap();
+    assert_eq!(db.distribution, "manjaro");
+    assert!(db.entries.iter().any(|entry| entry.source_package == "make"
+        && entry.nixpkgs_attribute.as_deref() == Some("gnumake")));
+    let mut duplicate = original.clone();
+    let entry = duplicate["entries"][0].clone();
+    duplicate["entries"].as_array_mut().unwrap().push(entry);
+    assert!(mapping::parse_database(&duplicate.to_string()).is_err());
+    let mut injection = original.clone();
+    injection["entries"][0]["nixpkgs_attribute"] = serde_json::json!("evil\"; builtins.abort \"no");
+    assert!(mapping::parse_database(&injection.to_string()).is_err());
+    let mut no_evidence = original.clone();
+    no_evidence["entries"][0]["verification"] = serde_json::Value::Null;
+    assert!(mapping::parse_database(&no_evidence.to_string()).is_err());
+    let mut wrong_distro = original;
+    wrong_distro["distribution"] = serde_json::json!("arch");
+    assert!(mapping::parse_database(&wrong_distro.to_string()).is_err());
+}

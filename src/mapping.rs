@@ -18,43 +18,98 @@ pub struct Decision {
     pub nixpkgs_attribute: Option<String>,
     pub reason: String,
 }
-// Deliberately small curated allowlist; these entries are not dynamically
-// checked against a specific Nixpkgs revision during offline generation.
-fn curated(name: &str) -> Option<&'static str> {
-    match name {
-        "git" => Some("git"),
-        "firefox" => Some("firefox"),
-        "neovim" => Some("neovim"),
-        "ripgrep" => Some("ripgrep"),
-        "curl" => Some("curl"),
-        "htop" => Some("htop"),
-        "alacritty" => Some("alacritty"),
-        "bat" => Some("bat"),
-        "btop" => Some("btop"),
-        "fd" => Some("fd"),
-        "ffmpeg" => Some("ffmpeg"),
-        "fish" => Some("fish"),
-        "fzf" => Some("fzf"),
-        "gcc" => Some("gcc"),
-        "jq" => Some("jq"),
-        "kitty" => Some("kitty"),
-        "less" => Some("less"),
-        "make" => Some("gnumake"),
-        "nano" => Some("nano"),
-        "nmap" => Some("nmap"),
-        "openssh" => Some("openssh"),
-        "rsync" => Some("rsync"),
-        "shellcheck" => Some("shellcheck"),
-        "tmux" => Some("tmux"),
-        "tree" => Some("tree"),
-        "unzip" => Some("unzip"),
-        "vlc" => Some("vlc"),
-        "wget" => Some("wget"),
-        "which" => Some("which"),
-        "xclip" => Some("xclip"),
-        "zsh" => Some("zsh"),
-        _ => None,
+/// Versioned, distro-specific data bundled into the binary for offline use.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MappingDatabase {
+    pub schema_version: u32,
+    pub distribution: String,
+    pub entries: Vec<MappingEntry>,
+}
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Verification {
+    pub nixpkgs_revision: String,
+    pub method: String,
+    pub limitations: String,
+}
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MappingEntry {
+    pub source_package: String,
+    pub kind: MappingKind,
+    pub nixpkgs_attribute: Option<String>,
+    pub note: String,
+    pub verification: Option<Verification>,
+}
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MappingKind {
+    Package,
+    ManualReview,
+}
+
+pub fn parse_database(json: &str) -> Result<MappingDatabase, String> {
+    let db: MappingDatabase =
+        serde_json::from_str(json).map_err(|e| format!("invalid mapping database: {e}"))?;
+    if db.schema_version != 1 || db.distribution != "manjaro" {
+        return Err("unsupported mapping database version or distribution".into());
     }
+    let mut names = std::collections::BTreeSet::new();
+    for entry in &db.entries {
+        if !crate::inventory::valid_package_name(&entry.source_package)
+            || !names.insert(&entry.source_package)
+        {
+            return Err(format!(
+                "invalid or duplicate mapping source: {:?}",
+                entry.source_package
+            ));
+        }
+        if entry.note.is_empty()
+            || entry.note.len() > 1000
+            || entry.note.chars().any(char::is_control)
+        {
+            return Err(format!("invalid mapping note: {:?}", entry.source_package));
+        }
+        match (&entry.kind, &entry.nixpkgs_attribute, &entry.verification) {
+            (MappingKind::Package, Some(attribute), Some(evidence))
+                if valid_attribute(attribute) =>
+            {
+                crate::draft::normalize_revision(&evidence.nixpkgs_revision)?;
+                if evidence.method != "local_attribute_is_derivation"
+                    || evidence.limitations.is_empty()
+                    || evidence.limitations.len() > 1000
+                    || evidence.limitations.chars().any(char::is_control)
+                {
+                    return Err(format!(
+                        "invalid verification metadata for {:?}",
+                        entry.source_package
+                    ));
+                }
+            }
+            (MappingKind::ManualReview, None, None) => {}
+            _ => {
+                return Err(format!(
+                    "invalid mapping target for {:?}",
+                    entry.source_package
+                ))
+            }
+        }
+    }
+    Ok(db)
+}
+fn bundled_database() -> &'static MappingDatabase {
+    static DATABASE: std::sync::OnceLock<MappingDatabase> = std::sync::OnceLock::new();
+    DATABASE.get_or_init(|| {
+        parse_database(include_str!("../mappings/manjaro.json"))
+            .expect("bundled Manjaro mappings must be valid")
+    })
+}
+fn curated(name: &str) -> Option<&'static MappingEntry> {
+    bundled_database()
+        .entries
+        .iter()
+        .find(|entry| entry.source_package == name)
 }
 pub fn decision(package: &Package) -> Decision {
     let (status, attr, reason) = if !package.explicitly_installed {
@@ -65,18 +120,15 @@ pub fn decision(package: &Package) -> Decision {
         )
     } else if package.foreign {
         (Status::Review, None, "Foreign package: provenance and equivalence require manual review; foreign does not mean AUR.")
-    } else if package.name == "base-devel" {
-        (
-            Status::Review,
-            None,
-            "Package group has no single equivalent; choose development tools manually.",
-        )
-    } else if let Some(attr) = curated(&package.name) {
-        (
-            Status::Mapped,
-            Some(attr.to_owned()),
-            "Curated package mapping; target-revision availability, configuration and behavior are not yet verified.",
-        )
+    } else if let Some(entry) = curated(&package.name) {
+        match entry.kind {
+            MappingKind::Package => (
+                Status::Mapped,
+                entry.nixpkgs_attribute.clone(),
+                entry.note.as_str(),
+            ),
+            MappingKind::ManualReview => (Status::Review, None, entry.note.as_str()),
+        }
     } else {
         (
             Status::Unmapped,
@@ -84,11 +136,19 @@ pub fn decision(package: &Package) -> Decision {
             "No curated mapping available; research and select a replacement manually.",
         )
     };
+    let reason = if status == Status::Mapped {
+        let evidence = curated(&package.name)
+            .and_then(|entry| entry.verification.as_ref())
+            .expect("validated package mapping must have verification metadata");
+        format!("{} Attribute was observed as a derivation at self-reported Nixpkgs revision {}; this does not prove equivalence or target availability.", reason, evidence.nixpkgs_revision)
+    } else {
+        reason.to_owned()
+    };
     Decision {
         package: package.name.clone(),
         status,
         nixpkgs_attribute: attr,
-        reason: reason.into(),
+        reason,
     }
 }
 pub fn decisions(inventory: &Inventory) -> Vec<Decision> {
