@@ -82,6 +82,19 @@
       }
     },
     {
+      "source_package": "catfish",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.catfish",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/apps/catfish/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/apps/catfish/start"
+      }
+    },
+    {
       "source_package": "chromium",
       "kind": "package",
       "nixpkgs_attribute": "chromium",
@@ -116,6 +129,19 @@
         "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
         "source_homepage": "https://www.gnu.org/software/diffutils",
         "nixpkgs_homepage": "https://www.gnu.org/software/diffutils/diffutils.html"
+      }
+    },
+    {
+      "source_package": "exo",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.exo",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/exo/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/exo"
       }
     },
     {
@@ -184,6 +210,19 @@
         "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
         "method": "local_attribute_is_derivation",
         "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "garcon",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.garcon",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/garcon/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/garcon"
       }
     },
     {
@@ -329,6 +368,19 @@
       }
     },
     {
+      "source_package": "mousepad",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.mousepad",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/apps/mousepad/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/apps/mousepad"
+      }
+    },
+    {
       "source_package": "nano",
       "kind": "package",
       "nixpkgs_attribute": "nano",
@@ -458,6 +510,58 @@
       }
     },
     {
+      "source_package": "thunar",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.thunar",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/thunar/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/thunar"
+      }
+    },
+    {
+      "source_package": "thunar-archive-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.thunar-archive-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/thunar/archive",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/thunar-plugins/thunar-archive-plugin"
+      }
+    },
+    {
+      "source_package": "thunar-media-tags-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.thunar-media-tags-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/thunar/media-tags",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/thunar-plugins/thunar-media-tags-plugin"
+      }
+    },
+    {
+      "source_package": "thunar-volman",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.thunar-volman",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/thunar/thunar-volman",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/thunar-volman"
+      }
+    },
+    {
       "source_package": "tmux",
       "kind": "package",
       "nixpkgs_attribute": "tmux",
@@ -477,6 +581,19 @@
         "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
         "method": "local_attribute_is_derivation",
         "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "tumbler",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.tumbler",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/tumbler/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/tumbler"
       }
     },
     {
@@ -571,6 +688,435 @@
         "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
         "source_homepage": "https://gitlab.freedesktop.org/xdg/xdg-utils",
         "nixpkgs_homepage": "https://www.freedesktop.org/wiki/Software/xdg-utils/"
+      }
+    },
+    {
+      "source_package": "xfburn",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfburn",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/apps/xfburn/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/apps/xfburn"
+      }
+    },
+    {
+      "source_package": "xfce4-appfinder",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-appfinder",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/xfce4-appfinder/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/xfce4-appfinder"
+      }
+    },
+    {
+      "source_package": "xfce4-battery-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-battery-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-battery-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-battery-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-clipman-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-clipman-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-clipman-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-clipman-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-cpufreq-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-cpufreq-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-cpufreq-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-cpufreq-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-cpugraph-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-cpugraph-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-cpugraph-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-cpugraph-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-dict",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-dict",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/apps/xfce4-dict/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/apps/xfce4-dict"
+      }
+    },
+    {
+      "source_package": "xfce4-fsguard-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-fsguard-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-fsguard-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-fsguard-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-genmon-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-genmon-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-genmon-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-genmon-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-mailwatch-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-mailwatch-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-mailwatch-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-mailwatch-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-mpc-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-mpc-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-mpc-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-mpc-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-netload-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-netload-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-netload-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-netload-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-notes-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-notes-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-notes-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-notes-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-notifyd",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-notifyd",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/apps/notifyd/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/apps/xfce4-notifyd"
+      }
+    },
+    {
+      "source_package": "xfce4-panel",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-panel",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/xfce4-panel/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/xfce4-panel"
+      }
+    },
+    {
+      "source_package": "xfce4-power-manager",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-power-manager",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/xfce4-power-manager/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/xfce4-power-manager"
+      }
+    },
+    {
+      "source_package": "xfce4-pulseaudio-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-pulseaudio-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-pulseaudio-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-pulseaudio-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-screenshooter",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-screenshooter",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/apps/xfce4-screenshooter/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/apps/xfce4-screenshooter"
+      }
+    },
+    {
+      "source_package": "xfce4-sensors-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-sensors-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-sensors-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-sensors-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-session",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-session",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/xfce4-session/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/xfce4-session"
+      }
+    },
+    {
+      "source_package": "xfce4-settings",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-settings",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/xfce4-settings/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/xfce4-settings"
+      }
+    },
+    {
+      "source_package": "xfce4-systemload-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-systemload-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-systemload-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-systemload-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-taskmanager",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-taskmanager",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/apps/xfce4-taskmanager/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/apps/xfce4-taskmanager"
+      }
+    },
+    {
+      "source_package": "xfce4-terminal",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-terminal",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/apps/terminal/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/apps/xfce4-terminal"
+      }
+    },
+    {
+      "source_package": "xfce4-time-out-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-time-out-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-time-out-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-time-out-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-timer-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-timer-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-timer-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-timer-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-verve-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-verve-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-verve-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-verve-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-weather-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-weather-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-weather-plugin/start",
+        "nixpkgs_homepage": "https://docs.xfce.org/panel-plugins/xfce4-weather-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-whiskermenu-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-whiskermenu-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-whiskermenu-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-whiskermenu-plugin"
+      }
+    },
+    {
+      "source_package": "xfce4-xkb-plugin",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfce4-xkb-plugin",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/panel-plugins/xfce4-xkb-plugin/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/panel-plugins/xfce4-xkb-plugin"
+      }
+    },
+    {
+      "source_package": "xfconf",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfconf",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/xfconf/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/xfconf"
+      }
+    },
+    {
+      "source_package": "xfdesktop",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfdesktop",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/xfdesktop/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/xfdesktop"
+      }
+    },
+    {
+      "source_package": "xfwm4",
+      "kind": "package",
+      "nixpkgs_attribute": "xfce.xfwm4",
+      "note": "Manjaro and Nixpkgs XFCE descriptions compared. Package inclusion alone does not configure or enable an XFCE session or its plugins.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Manjaro repository and Nixpkgs XFCE descriptions and homepage references were compared. Checkout revision is self-reported; the check does not establish identical behavior, buildability, configuration or availability on another revision.",
+        "source_homepage": "https://docs.xfce.org/xfce/xfwm4/start",
+        "nixpkgs_homepage": "https://gitlab.xfce.org/xfce/xfwm4"
       }
     },
     {

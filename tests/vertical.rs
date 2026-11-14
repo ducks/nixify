@@ -643,6 +643,9 @@ fn reviewed_mappings_reject_injection_duplicates_dependencies_and_wrong_revision
     let target = "0123456789abcdef0123456789abcdef01234567";
     for review in [
         check(vec![item("git", "x\"; builtins.abort \"bad")], None),
+        check(vec![item("git", "xfce..exo")], None),
+        check(vec![item("git", ".xfce")], None),
+        check(vec![item("git", "xfce.exo.")], None),
         check(vec![item("git", "htop"), item("git", "git")], None),
         check(vec![item("libexample", "htop")], None),
         check(vec![item("missing", "htop")], None),
@@ -837,7 +840,7 @@ fn generated_inferences_are_snapshotted_and_reject_unsafe_edits() {
 }
 
 #[test]
-fn same_name_collision_stays_unmapped_and_known_tools_are_curated() {
+fn same_name_collision_uses_correct_nested_attribute() {
     use nixify::inventory::Package;
     let package = |name: &str| Package {
         name: name.into(),
@@ -846,7 +849,10 @@ fn same_name_collision_stays_unmapped_and_known_tools_are_curated() {
         foreign: false,
         evidence: vec![],
     };
-    assert_eq!(mapping::decision(&package("exo")).status, Status::Unmapped);
+    let exo = mapping::decision(&package("exo"));
+    assert_eq!(exo.status, Status::Mapped);
+    assert_eq!(exo.nixpkgs_attribute.as_deref(), Some("xfce.exo"));
+    assert!(output::packages_nix(&[exo]).contains("pkgs.\"xfce\".\"exo\""));
     let zola = mapping::decision(&package("zola"));
     assert_eq!(zola.status, Status::Mapped);
     assert_eq!(zola.nixpkgs_attribute.as_deref(), Some("zola"));
@@ -876,4 +882,34 @@ fn drafts_from_before_catalog_expansion_remain_checkable() {
     fs::write(dir.join("packages.nix"), output::packages_nix(&previous)).unwrap();
     let (_, attributes) = nixify::draft::expected_attributes(&dir, &inv).unwrap();
     assert!(!attributes.contains(&"zola".to_owned()));
+}
+
+#[test]
+fn reviewed_nested_attributes_are_quoted_and_snapshotted() {
+    use nixify::mapping::{ReviewedMapping, ReviewedMappings};
+    let inv = fixture();
+    let review = ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: None,
+        mappings: vec![ReviewedMapping {
+            source_package: "git".into(),
+            nixpkgs_attribute: "xfce.exo".into(),
+        }],
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("draft");
+    output::generate_with_review(
+        &inv,
+        &dir,
+        &nixify::draft::default_revision().unwrap(),
+        &review,
+    )
+    .unwrap();
+    assert!(fs::read_to_string(dir.join("packages.nix"))
+        .unwrap()
+        .contains("pkgs.\"xfce\".\"exo\""));
+    assert!(nixify::draft::expected_attributes(&dir, &inv)
+        .unwrap()
+        .1
+        .contains(&"xfce.exo".to_owned()));
 }

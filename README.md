@@ -62,7 +62,7 @@ After checking individual packages yourself, create a review file. This example 
 }
 ```
 
-Pass it explicitly to `nixify report --input inventory.json --reviewed-mappings review.json` or `nixify generate --input inventory.json --output ./nixos-migration --reviewed-mappings review.json`. Each source must be explicitly installed; foreign packages can also be overridden by explicit review. Attribute values are single top-level names, not arbitrary Nix expressions. If the review declares a revision, it must match the generated flake pin. The report labels these as user-reviewed, not automatically verified; use `validate --nixpkgs` to check attribute existence. Review files and suggestions disclose installed software and should be protected like inventories.
+Pass it explicitly to `nixify report --input inventory.json --reviewed-mappings review.json` or `nixify generate --input inventory.json --output ./nixos-migration --reviewed-mappings review.json`. Each source must be explicitly installed; foreign packages can also be overridden by explicit review. Attribute values are dot-separated Nixpkgs paths such as `xfce.exo`, not arbitrary Nix expressions; each path component is validated and quoted. If the review declares a revision, it must match the generated flake pin. The report labels these as user-reviewed, not automatically verified; use `validate --nixpkgs` to check attribute existence. Review files and suggestions disclose installed software and should be protected like inventories.
 
 ## Optional NixOS baseline
 
