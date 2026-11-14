@@ -52,16 +52,31 @@ pub fn services_nix(decisions: &[ServiceDecision]) -> String {
 }
 
 pub fn desktop_nix(inventory: &Inventory) -> String {
-    let mut out = String::from("# Suggestions only: confirm the intended desktop and target NixOS options before enabling.\n{ ... }:\n{\n");
-    let options: BTreeSet<_> = inventory
+    desktop_nix_with_selection(inventory, None)
+}
+
+pub fn desktop_nix_with_selection(
+    inventory: &Inventory,
+    selected: Option<desktop::DesktopKind>,
+) -> String {
+    let mut out = String::from(
+        "# Migration draft: review desktop options and target revision.\n{ ... }:\n{\n",
+    );
+    let mut options: BTreeSet<_> = inventory
         .desktop
         .as_ref()
         .into_iter()
         .flat_map(|desktop| desktop.candidates.iter())
         .filter_map(|candidate| desktop::suggested_option(candidate.kind))
         .collect();
+    let selected_option = selected.and_then(desktop::suggested_option);
+    options.extend(selected_option);
     for option in options {
-        let _ = writeln!(out, "  # {option} = true;");
+        if Some(option) == selected_option {
+            let _ = writeln!(out, "  {option} = true; # explicitly selected");
+        } else {
+            let _ = writeln!(out, "  # {option} = true;");
+        }
     }
     out.push_str("}\n");
     out
@@ -156,7 +171,7 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
     } else {
         let _ = writeln!(out, "Recognized enabled display-manager services: {:?}; confirm their configuration manually.", managers);
     }
-    out.push_str("Desktop module options in desktop.nix are commented suggestions only. Verify the target NixOS revision and select the intended desktop and display manager.\n");
+    out.push_str("Desktop evidence does not establish a system default. Inspect desktop.nix for explicitly selected options; verify the target NixOS revision and choose a display manager.\n");
     out.push_str("\n## Hardware and filesystems (planning evidence)\n\n");
     if let Some(hardware) = &inventory.hardware {
         let _ = writeln!(
@@ -279,7 +294,20 @@ pub fn generate_with_review(
     revision: &str,
     review: &mapping::ReviewedMappings,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_desktop(inventory, dir, revision, review, None)
+}
+
+pub fn generate_with_desktop(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+    selected: Option<desktop::DesktopKind>,
+) -> Result<(), Box<dyn std::error::Error>> {
     inventory.validate().map_err(io::Error::other)?;
+    if selected.is_some_and(|kind| desktop::suggested_option(kind).is_none()) {
+        return Err(io::Error::other("unsupported desktop selection").into());
+    }
     let flake =
         crate::draft::flake(&inventory.source.architecture, revision).map_err(io::Error::other)?;
     let revision = crate::draft::normalize_revision(revision).map_err(io::Error::other)?;
@@ -301,7 +329,10 @@ pub fn generate_with_review(
         &dir.join("services.nix"),
         &services_nix(&service_mapping::decisions(inventory)),
     )?;
-    create_file(&dir.join("desktop.nix"), &desktop_nix(inventory))?;
+    create_file(
+        &dir.join("desktop.nix"),
+        &desktop_nix_with_selection(inventory, selected),
+    )?;
     if !review.mappings.is_empty() {
         let mut review = review.clone();
         review
@@ -314,7 +345,7 @@ pub fn generate_with_review(
     }
     create_file(
         &dir.join("migration-report.md"),
-        &format!("{}\n## Target draft\n\n- Nixpkgs revision: `{}` (not yet resolved or validated).\n- No flake.lock was generated.\n- Supply reviewed hardware, boot, filesystems, users, networking and system.stateVersion before use.\n", report(inventory, &decisions), revision),
+        &format!("{}\n## Target draft\n\n- Nixpkgs revision: `{}` (not yet resolved or validated).\n- Explicit desktop selection: {}.\n- No flake.lock was generated.\n- Supply reviewed hardware, boot, filesystems, users, networking and system.stateVersion before use.\n", report(inventory, &decisions), revision, selected.map(|kind| format!("{kind:?}")).unwrap_or_else(|| "none".into())),
     )?;
     let mut sorted = inventory.clone();
     sorted.packages.sort_by(|a, b| a.name.cmp(&b.name));

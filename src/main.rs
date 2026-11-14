@@ -1,5 +1,7 @@
-use clap::{Parser, Subcommand};
-use nixify::{baseline, draft, inventory::Inventory, manjaro, mapping, output, suggest};
+use clap::{Parser, Subcommand, ValueEnum};
+use nixify::{
+    baseline, desktop::DesktopKind, draft, inventory::Inventory, manjaro, mapping, output, suggest,
+};
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
@@ -14,6 +16,19 @@ use std::{
 struct Cli {
     #[command(subcommand)]
     command: Command,
+}
+#[derive(Clone, Copy, ValueEnum)]
+enum DesktopSelection {
+    Hyprland,
+    Xfce,
+}
+impl From<DesktopSelection> for DesktopKind {
+    fn from(value: DesktopSelection) -> Self {
+        match value {
+            DesktopSelection::Hyprland => Self::Hyprland,
+            DesktopSelection::Xfce => Self::Xfce,
+        }
+    }
 }
 #[derive(Subcommand)]
 enum Command {
@@ -36,6 +51,9 @@ enum Command {
         /// Explicitly reviewed mappings in JSON; never inferred automatically.
         #[arg(long)]
         reviewed_mappings: Option<PathBuf>,
+        /// Explicitly choose a desktop to enable; detection alone remains a hint.
+        #[arg(long, value_enum)]
+        desktop: Option<DesktopSelection>,
     },
     /// Check Nix syntax without resolving inputs, building, or activating.
     Validate {
@@ -114,6 +132,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             output: dir,
             nixpkgs_rev,
             reviewed_mappings,
+            desktop,
         } => {
             let inventory = read_inventory(&input)?;
             let revision = match nixpkgs_rev {
@@ -124,7 +143,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Some(path) => mapping::read_reviewed(&path).map_err(std::io::Error::other)?,
                 None => mapping::ReviewedMappings::empty(),
             };
-            output::generate_with_review(&inventory, &dir, &revision, &reviewed)?;
+            output::generate_with_desktop(
+                &inventory,
+                &dir,
+                &revision,
+                &reviewed,
+                desktop.map(Into::into),
+            )?;
             eprintln!("Wrote migration draft to {}", dir.display());
         }
         Command::Validate {

@@ -28,9 +28,18 @@ For trusted drafts and Nixpkgs checkouts, `nixify validate ./nixos-migration --n
 
 `desktop.nix` contains commented suggestions for recognized desktop packages,
 session files and process session hints. No desktop or display manager is
-selected automatically. Installed packages and available sessions do not prove
-which desktop is configured by default; confirm the options for your target
-NixOS version before enabling one.
+selected automatically. To choose one explicitly, add `--desktop hyprland` or
+`--desktop xfce` to `nixify generate`. This enables the selected NixOS module
+in the draft; it does not migrate desktop configuration, configure a login
+manager, or prove a graphical session will work. For example:
+
+```sh
+nixify generate --input inventory.json --output ./nixos-migration --desktop hyprland
+```
+
+Installed packages and session hints do not establish the system default.
+The report recognizes enabled Lemurs, but does not generate its configuration.
+Confirm desktop and display-manager options for your target NixOS revision.
 
 Hardware discovery uses `/proc/cpuinfo`, EFI interface presence, `lspci`, and
 `lsblk` for planning evidence. Absence of the EFI interface is reported as

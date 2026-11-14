@@ -945,3 +945,44 @@ fn desktop_and_workstation_services_require_persistent_system_enablement() {
         .reason
         .contains("firewall"));
 }
+
+#[test]
+fn cli_desktop_choice_is_explicit_and_preserves_other_hints() {
+    use nixify::{desktop, inventory::Scope, systemd};
+    let mut inv = fixture();
+    inv.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("lemurs.service enabled enabled\n"),
+        None,
+    )];
+    assert_eq!(desktop::enabled_display_managers(&inv), vec!["Lemurs"]);
+    let root = tempfile::tempdir().unwrap();
+    inv.desktop = Some(desktop::detect(
+        &inv,
+        Some("XFCE"),
+        Some("x11"),
+        root.path(),
+    ));
+    let inventory_path = root.path().join("inventory.json");
+    fs::write(&inventory_path, serde_json::to_vec(&inv).unwrap()).unwrap();
+    let dir = root.path().join("draft");
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["generate", "--input"])
+        .arg(&inventory_path)
+        .args(["--output"])
+        .arg(&dir)
+        .args(["--desktop", "hyprland"])
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let module = fs::read_to_string(dir.join("desktop.nix")).unwrap();
+    assert!(module.contains("  programs.hyprland.enable = true; # explicitly selected"));
+    assert!(module.contains("  # services.xserver.desktopManager.xfce.enable = true;"));
+    let report = fs::read_to_string(dir.join("migration-report.md")).unwrap();
+    assert!(report.contains("Explicit desktop selection: Hyprland"));
+    assert!(report.contains("Lemurs"));
+}

@@ -2,7 +2,7 @@
 
 This optional test builds a **disposable VM**, not an installer. It imports a trusted generated `configuration.nix` using a chosen local Nixpkgs checkout. The VM-only harness supplies `system.stateVersion`, uses an 8 GiB virtual disk, gives the serial console an automatic root login, disables its network interface, and configures no shared host directories. Its Nix store is copied into a separate VM image. Never use this harness as a production configuration or with untrusted generated Nix code: Nix evaluation can read or fetch inputs requested by that code.
 
-The build writes to the local Nix store and may download packages and consume substantial disk space. The VM disk and store image live under a new private `.nixify-vm-*` directory in the repository; no physical disk is attached. QEMU and Nix must work on the host. KVM speeds up the test; the smoke runner requests software emulation when `/dev/kvm` is unavailable. Generated packages and services are only the mappings nixify currently knows about; desktop options are comments, so this is not a graphical-desktop or migration-equivalence test.
+The build writes to the local Nix store and may download packages and consume substantial disk space. The VM disk and store image live under a new private `.nixify-vm-*` directory in the repository; no physical disk is attached. QEMU and Nix must work on the host. KVM speeds up the test; the smoke runner requests software emulation when `/dev/kvm` is unavailable. Generated packages and services are only the mappings nixify currently knows about; desktop options are comments unless explicitly selected, and this is not a graphical-desktop or migration-equivalence test.
 
 From a normal Manjaro terminal, in the nixify repository:
 
