@@ -18,6 +18,13 @@ fn mapped(name: &str) -> Option<&'static str> {
         "caddy.service" => Some("services.caddy.enable"),
         "docker.service" => Some("virtualisation.docker.enable"),
         "postgresql.service" => Some("services.postgresql.enable"),
+        "avahi-daemon.service" => Some("services.avahi.enable"),
+        "bluetooth.service" => Some("hardware.bluetooth.enable"),
+        "cups.service" => Some("services.printing.enable"),
+        "libvirtd.service" => Some("virtualisation.libvirtd.enable"),
+        "tlp.service" => Some("services.tlp.enable"),
+        "ollama.service" => Some("services.ollama.enable"),
+        "mullvad-daemon.service" => Some("services.mullvad-vpn.enable"),
         _ => None,
     }
 }
@@ -40,7 +47,11 @@ pub fn decisions(inventory: &Inventory) -> Vec<ServiceDecision> {
             } else {
                 None
             };
-            let reason = if attr.is_some() {
+            let reason = if attr.is_some() && service.name == "mullvad-daemon.service" {
+                "Proposed Mullvad enablement only; on the checked Nixpkgs revision this changes reverse-path firewall checking to loose. Review security settings, account state, target revision and connectivity."
+            } else if attr.is_some() && service.name == "tlp.service" {
+                "Proposed TLP enablement only; review power settings and conflicts with other power-management services on the target revision."
+            } else if attr.is_some() {
                 "Proposed module enablement only; configuration, data, security settings and target availability require review."
             } else if scope.scope == Scope::User {
                 "User service requires manual migration; no system service was generated."

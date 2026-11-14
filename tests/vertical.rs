@@ -913,3 +913,35 @@ fn reviewed_nested_attributes_are_quoted_and_snapshotted() {
         .1
         .contains(&"xfce.exo".to_owned()));
 }
+
+#[test]
+fn desktop_and_workstation_services_require_persistent_system_enablement() {
+    use nixify::{inventory::Scope, service_mapping, systemd};
+    let mut inv = fixture();
+    inv.service_scopes = vec![
+        systemd::from_outputs(Scope::System, Some("avahi-daemon.service enabled enabled\nbluetooth.service enabled enabled\ncups.service enabled enabled\nlibvirtd.service enabled enabled\ntlp.service enabled enabled\nollama.service disabled disabled\nmullvad-daemon.service enabled enabled\n"), Some("ollama.service loaded active running Ollama\n")),
+        systemd::from_outputs(Scope::User, Some("ollama.service enabled enabled\n"), None),
+    ];
+    let decisions = service_mapping::decisions(&inv);
+    let module = output::services_nix(&decisions);
+    for option in [
+        "services.avahi.enable",
+        "hardware.bluetooth.enable",
+        "services.printing.enable",
+        "virtualisation.libvirtd.enable",
+        "services.tlp.enable",
+        "services.mullvad-vpn.enable",
+    ] {
+        assert!(
+            module.contains(&format!("{option} = true;")),
+            "missing {option}"
+        );
+    }
+    assert!(!module.contains("services.ollama.enable"));
+    assert!(decisions
+        .iter()
+        .find(|d| d.service == "mullvad-daemon.service")
+        .unwrap()
+        .reason
+        .contains("firewall"));
+}
