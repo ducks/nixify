@@ -229,7 +229,7 @@ pub struct ReviewedMappings {
 #[serde(deny_unknown_fields)]
 pub struct ReviewedMapping {
     pub source_package: String,
-    /// A single top-level Nixpkgs attribute, never an expression or attribute path.
+    /// Dot-separated Nixpkgs attribute path, never an arbitrary Nix expression.
     pub nixpkgs_attribute: String,
 }
 impl ReviewedMappings {
@@ -256,9 +256,13 @@ pub fn read_reviewed(path: &Path) -> Result<ReviewedMappings, String> {
 pub(crate) fn valid_attribute(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 255
-        && value
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"_+-".contains(&b))
+        && value.split('.').count() <= 8
+        && value.split('.').all(|part| {
+            !part.is_empty()
+                && part
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"_+-".contains(&b))
+        })
 }
 pub fn reviewed_decisions(
     inventory: &Inventory,
@@ -286,7 +290,7 @@ pub fn reviewed_decisions(
     for item in &review.mappings {
         if !valid_attribute(&item.nixpkgs_attribute) {
             return Err(format!(
-                "invalid top-level Nixpkgs attribute: {:?}",
+                "invalid Nixpkgs attribute path: {:?}",
                 item.nixpkgs_attribute
             ));
         }

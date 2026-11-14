@@ -19,7 +19,11 @@ pub fn packages_nix(decisions: &[Decision]) -> String {
         .collect();
     let mut out = String::from("# Migration draft. Package mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n");
     for attr in attrs {
-        let _ = writeln!(out, "    pkgs.\"{attr}\"");
+        let path = attr
+            .split('.')
+            .map(|part| format!(".\"{part}\""))
+            .collect::<String>();
+        let _ = writeln!(out, "    pkgs{path}");
     }
     out.push_str("  ];\n}\n");
     out

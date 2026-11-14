@@ -293,7 +293,7 @@ const ATTRIBUTE_EXPRESSION: &str = r#"{ nixpkgsPath, system, attributesJson }:
 let
   pkgs = import (builtins.toPath nixpkgsPath) { inherit system; };
   attrs = builtins.fromJSON attributesJson;
-in builtins.listToAttrs (map (name: { inherit name; value = builtins.hasAttr name pkgs; }) attrs)
+in builtins.listToAttrs (map (name: { inherit name; value = pkgs.lib.hasAttrByPath (pkgs.lib.splitString "." name) pkgs; }) attrs)
 "#;
 
 pub fn check_attributes(
