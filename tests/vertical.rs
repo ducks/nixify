@@ -775,24 +775,63 @@ fn distribution_mapping_database_requires_safe_unique_evidenced_entries() {
 }
 
 #[test]
-fn bundled_catalogs_explain_candidates_without_selecting_them() {
+fn strong_catalog_matches_are_inferred_and_weak_matches_remain_unresolved() {
     use nixify::inventory::Package;
-    let package = |name: &str, foreign: bool| Package {
+    let package = |name: &str, foreign: bool, explicit: bool| Package {
         name: name.into(),
         version: "1".into(),
-        explicitly_installed: true,
+        explicitly_installed: explicit,
         foreign,
         evidence: vec![],
     };
-    let repo = mapping::decision(&package("acl", false));
-    assert_eq!(repo.status, Status::Unmapped);
-    assert!(repo
-        .reason
-        .contains("Manjaro repository candidate: Nixpkgs acl"));
-    assert!(repo.nixpkgs_attribute.is_none());
-    let aur = mapping::decision(&package("paru", true));
-    assert_eq!(aur.status, Status::Review);
-    assert!(aur.reason.contains("AUR catalog candidate: Nixpkgs paru"));
-    assert!(aur.nixpkgs_attribute.is_none());
-    assert!(!output::packages_nix(&[repo, aur]).contains("pkgs.\"acl\""));
+    let repo = mapping::decision(&package("acl", false, true));
+    assert_eq!(repo.status, Status::Inferred);
+    assert!(repo.reason.contains("same name and upstream homepage"));
+    assert_eq!(repo.nixpkgs_attribute.as_deref(), Some("acl"));
+    let aur = mapping::decision(&package("paru", true, true));
+    assert_eq!(aur.status, Status::Inferred);
+    assert!(aur.reason.contains("does not prove AUR provenance"));
+    assert_eq!(
+        mapping::decision(&package("android-studio", true, true)).status,
+        Status::Review
+    );
+    assert_eq!(
+        mapping::decision(&package("acl", false, false)).status,
+        Status::Dependency
+    );
+    assert!(output::packages_nix(&[repo, aur]).contains("pkgs.\"acl\""));
+}
+
+#[test]
+fn generated_inferences_are_snapshotted_and_reject_unsafe_edits() {
+    use nixify::inventory::Package;
+    let mut inv = fixture();
+    inv.packages.push(Package {
+        name: "acl".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("draft");
+    output::generate(&inv, &dir).unwrap();
+    let report = fs::read_to_string(dir.join("migration-report.md")).unwrap();
+    assert!(report.contains("Inferred mappings"));
+    assert!(nixify::draft::expected_attributes(&dir, &inv)
+        .unwrap()
+        .1
+        .contains(&"acl".to_owned()));
+    let path = dir.join("package-decisions.json");
+    let mut decisions: serde_json::Value =
+        serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    let entry = decisions
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|d| d["package"] == "acl")
+        .unwrap();
+    entry["nixpkgs_attribute"] = serde_json::json!("evil\"; builtins.abort \"bad");
+    fs::write(path, decisions.to_string()).unwrap();
+    assert!(nixify::draft::expected_attributes(&dir, &inv).is_err());
 }

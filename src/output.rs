@@ -81,7 +81,7 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         .iter()
         .filter(|p| p.explicitly_installed)
         .count();
-    let mut out = format!("# nixify migration report\n\nSource: Manjaro Linux ({})\n\n## Packages\n\n- Explicitly installed: {explicit}\n- Curated mappings (not revision-validated): {}\n- User-reviewed mappings (not automatically verified): {}\n- Require review: {}\n- No mapping: {}\n- Dependency-installed, not selected: {}\n\n", inventory.source.architecture, count(Status::Mapped), count(Status::Reviewed), count(Status::Review), count(Status::Unmapped), count(Status::Dependency));
+    let mut out = format!("# nixify migration report\n\nSource: Manjaro Linux ({})\n\n## Packages\n\n- Explicitly installed: {explicit}\n- Curated mappings (not revision-validated): {}\n- User-reviewed mappings (not automatically verified): {}\n- Inferred mappings (same name and upstream homepage; review): {}\n- Require review: {}\n- No mapping: {}\n- Dependency-installed, not selected: {}\n\n", inventory.source.architecture, count(Status::Mapped), count(Status::Reviewed), count(Status::Inferred), count(Status::Review), count(Status::Unmapped), count(Status::Dependency));
     out.push_str("## Package decisions\n\n");
     for d in decisions.iter().filter(|d| d.status != Status::Dependency) {
         let _ = writeln!(
@@ -240,7 +240,7 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         out.push_str("Network manager service state is unknown.\n");
     }
     out.push_str("Hostname, interface configuration, DNS addresses, VPNs and effective firewall rules require manual review.\n");
-    out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop hints do not establish your configured default; verify hardware, networking, filesystems, and boot configuration separately.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Review foreign packages individually; they are not automatically mapped.\n");
+    out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop hints do not establish your configured default; verify hardware, networking, filesystems, and boot configuration separately.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Inferred matches include some foreign packages; foreign status does not establish AUR provenance. Review inferred packages together in packages.nix and this report.\n");
     out
 }
 fn create_file(path: &Path, data: &str) -> io::Result<()> {
@@ -289,6 +289,10 @@ pub fn generate_with_review(
         crate::draft::configuration(),
     )?;
     create_file(&dir.join("packages.nix"), &packages_nix(&decisions))?;
+    create_file(
+        &dir.join("package-decisions.json"),
+        &(serde_json::to_string_pretty(&decisions)? + "\n"),
+    )?;
     create_file(
         &dir.join("services.nix"),
         &services_nix(&service_mapping::decisions(inventory)),

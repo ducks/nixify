@@ -142,13 +142,88 @@ pub fn expected_attributes(
     let decisions = crate::mapping::reviewed_decisions(inventory, &review, Some(&revision))?;
     let package_text = fs::read_to_string(dir.join("packages.nix"))
         .map_err(|e| format!("cannot read packages.nix: {e}"))?;
+    // A snapshot keeps generated drafts verifiable after the bundled catalog changes.
+    // It is data, not proof that the files have not been edited together.
+    let snapshot_path = dir.join("package-decisions.json");
+    let snapshot = match fs::symlink_metadata(&snapshot_path) {
+        Ok(metadata) if metadata.file_type().is_file() && metadata.len() <= 16 * 1024 * 1024 => {
+            let bytes = fs::read(&snapshot_path)
+                .map_err(|e| format!("cannot read package decisions: {e}"))?;
+            let entries: Vec<crate::mapping::Decision> = serde_json::from_slice(&bytes)
+                .map_err(|e| format!("invalid package decisions: {e}"))?;
+            let packages: std::collections::BTreeMap<_, _> = inventory
+                .packages
+                .iter()
+                .map(|p| (p.name.as_str(), p))
+                .collect();
+            let mut names = std::collections::BTreeSet::new();
+            if entries.len() != packages.len()
+                || entries.iter().any(|entry| {
+                    let Some(package) = packages.get(entry.package.as_str()) else {
+                        return true;
+                    };
+                    !names.insert(entry.package.as_str())
+                        || match &entry.nixpkgs_attribute {
+                            Some(attr) => {
+                                !package.explicitly_installed
+                                    || !crate::mapping::valid_attribute(attr)
+                                    || !matches!(
+                                        entry.status,
+                                        crate::mapping::Status::Mapped
+                                            | crate::mapping::Status::Inferred
+                                            | crate::mapping::Status::Reviewed
+                                    )
+                            }
+                            None => matches!(
+                                entry.status,
+                                crate::mapping::Status::Mapped
+                                    | crate::mapping::Status::Inferred
+                                    | crate::mapping::Status::Reviewed
+                            ),
+                        }
+                })
+            {
+                return Err(
+                    "package decisions do not match the inventory or contain unsafe attributes"
+                        .into(),
+                );
+            }
+            Some(entries)
+        }
+        Ok(_) => {
+            return Err(
+                "package-decisions.json must be a regular non-symlink file under 16 MiB".into(),
+            )
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("cannot inspect package decisions: {error}")),
+    };
+    if let Some(entries) = &snapshot {
+        if package_text == crate::output::packages_nix(entries) {
+            let attrs = entries
+                .iter()
+                .filter_map(|d| d.nixpkgs_attribute.clone())
+                .collect::<std::collections::BTreeSet<_>>()
+                .into_iter()
+                .collect();
+            return Ok((revision, attrs));
+        }
+    }
+    // Drafts before inferred mappings did not include catalog candidates.
+    let mut pre_inference = decisions.clone();
+    for decision in &mut pre_inference {
+        if decision.status == crate::mapping::Status::Inferred {
+            decision.nixpkgs_attribute = None;
+        }
+    }
     // Drafts created before the curated list expanded must stay verifiable.
     // Reconstruct the original six-entry mapping rather than interpreting Nix.
     let mut original_decisions = crate::mapping::decisions(inventory);
     for decision in &mut original_decisions {
-        if decision.status == crate::mapping::Status::Mapped
-            && !["git", "firefox", "neovim", "ripgrep", "curl", "htop"]
-                .contains(&decision.package.as_str())
+        if decision.status == crate::mapping::Status::Inferred
+            || (decision.status == crate::mapping::Status::Mapped
+                && !["git", "firefox", "neovim", "ripgrep", "curl", "htop"]
+                    .contains(&decision.package.as_str()))
         {
             decision.nixpkgs_attribute = None;
         }
@@ -156,7 +231,9 @@ pub fn expected_attributes(
     let prior_six = review.mappings.is_empty()
         && (package_text == crate::output::legacy_packages_nix(&original_decisions)
             || package_text == crate::output::packages_nix(&original_decisions));
-    if package_text != crate::output::packages_nix(&decisions) && !prior_six {
+    let prior_catalog =
+        snapshot.is_none() && package_text == crate::output::packages_nix(&pre_inference);
+    if !prior_six && !prior_catalog {
         return Err(
             "packages.nix or inventory was edited; cannot reliably enumerate referenced attributes"
                 .into(),
@@ -165,7 +242,7 @@ pub fn expected_attributes(
     let checked_decisions = if prior_six {
         original_decisions
     } else {
-        decisions
+        pre_inference
     };
     let attrs = checked_decisions
         .into_iter()

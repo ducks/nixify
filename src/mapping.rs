@@ -2,16 +2,18 @@ use crate::inventory::{Inventory, Package};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs::File, io::Read, path::Path};
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Status {
     Mapped,
+    Inferred,
     Reviewed,
     Review,
     Unmapped,
     Dependency,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Decision {
     pub package: String,
     pub status: Status,
@@ -171,23 +173,24 @@ pub fn decision(package: &Package) -> Decision {
             "No curated mapping available; research and select a replacement manually.",
         )
     };
-    let reason = if status == Status::Unmapped && package.explicitly_installed {
+    let (status, attr, reason) = if status == Status::Unmapped && package.explicitly_installed {
         match manjaro_candidate(&package.name) {
-            Some(candidate) => format!("Unreviewed Manjaro repository candidate: Nixpkgs {} ({}); verify equivalence, licensing and target availability before explicitly reviewing it.", candidate.nixpkgs_attribute, candidate.evidence),
-            None => reason.to_owned(),
+            Some(candidate) => (Status::Inferred, Some(candidate.nixpkgs_attribute.clone()), "Inferred from Manjaro repository and Nixpkgs metadata: same name and upstream homepage. Verify equivalence, features, licensing and availability at the target revision; catalog checkout revision is self-reported and may differ.".to_owned()),
+            None => (status, attr, reason.to_owned()),
         }
     } else if package.explicitly_installed && package.foreign {
         match aur_candidate(&package.name) {
-            Some(candidate) => format!("{reason} AUR catalog candidate: Nixpkgs {} ({}); verify provenance, equivalence, licensing and target availability before explicitly reviewing it.", candidate.nixpkgs_attribute, candidate.evidence),
-            None => reason.to_owned(),
+            Some(candidate) if candidate.evidence == "same_name_and_upstream_homepage" => (Status::Inferred, Some(candidate.nixpkgs_attribute.clone()), "Inferred from AUR and Nixpkgs metadata: same name and upstream homepage. Foreign status does not prove AUR provenance; verify provenance, equivalence, licensing and target availability.".to_owned()),
+            Some(candidate) => (status, attr, format!("{reason} AUR name-only candidate: Nixpkgs {}; no homepage match. Review before including.", candidate.nixpkgs_attribute)),
+            None => (status, attr, reason.to_owned()),
         }
     } else if status == Status::Mapped {
         let evidence = curated(&package.name)
             .and_then(|entry| entry.verification.as_ref())
             .expect("validated package mapping must have verification metadata");
-        format!("{} Attribute was observed as a derivation at self-reported Nixpkgs revision {}; this does not prove equivalence or target availability.", reason, evidence.nixpkgs_revision)
+        (status, attr, format!("{} Attribute was observed as a derivation at self-reported Nixpkgs revision {}; this does not prove equivalence or target availability.", reason, evidence.nixpkgs_revision))
     } else {
-        reason.to_owned()
+        (status, attr, reason.to_owned())
     };
     Decision {
         package: package.name.clone(),
@@ -238,7 +241,7 @@ pub fn read_reviewed(path: &Path) -> Result<ReviewedMappings, String> {
     }
     serde_json::from_slice(&bytes).map_err(|e| format!("invalid reviewed mappings: {e}"))
 }
-fn valid_attribute(value: &str) -> bool {
+pub(crate) fn valid_attribute(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 255
         && value
