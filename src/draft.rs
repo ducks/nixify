@@ -216,6 +216,22 @@ pub fn expected_attributes(
             decision.nixpkgs_attribute = None;
         }
     }
+    // Drafts predating decision snapshots used the original bundled catalog.
+    // Keep those drafts checkable when new curated entries are added.
+    let old_db = crate::mapping::parse_database(include_str!("../mappings/manjaro-v1.json"))?;
+    let old_names: std::collections::BTreeSet<_> = old_db
+        .entries
+        .iter()
+        .map(|e| e.source_package.as_str())
+        .collect();
+    let mut prior_curated = pre_inference.clone();
+    for decision in &mut prior_curated {
+        if decision.status == crate::mapping::Status::Mapped
+            && !old_names.contains(decision.package.as_str())
+        {
+            decision.nixpkgs_attribute = None;
+        }
+    }
     // Drafts created before the curated list expanded must stay verifiable.
     // Reconstruct the original six-entry mapping rather than interpreting Nix.
     let mut original_decisions = crate::mapping::decisions(inventory);
@@ -233,7 +249,9 @@ pub fn expected_attributes(
             || package_text == crate::output::packages_nix(&original_decisions));
     let prior_catalog =
         snapshot.is_none() && package_text == crate::output::packages_nix(&pre_inference);
-    if !prior_six && !prior_catalog {
+    let prior_curated_match =
+        snapshot.is_none() && package_text == crate::output::packages_nix(&prior_curated);
+    if !prior_six && !prior_catalog && !prior_curated_match {
         return Err(
             "packages.nix or inventory was edited; cannot reliably enumerate referenced attributes"
                 .into(),
@@ -241,8 +259,10 @@ pub fn expected_attributes(
     }
     let checked_decisions = if prior_six {
         original_decisions
-    } else {
+    } else if prior_catalog {
         pre_inference
+    } else {
+        prior_curated
     };
     let attrs = checked_decisions
         .into_iter()

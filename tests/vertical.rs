@@ -835,3 +835,45 @@ fn generated_inferences_are_snapshotted_and_reject_unsafe_edits() {
     fs::write(path, decisions.to_string()).unwrap();
     assert!(nixify::draft::expected_attributes(&dir, &inv).is_err());
 }
+
+#[test]
+fn same_name_collision_stays_unmapped_and_known_tools_are_curated() {
+    use nixify::inventory::Package;
+    let package = |name: &str| Package {
+        name: name.into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    };
+    assert_eq!(mapping::decision(&package("exo")).status, Status::Unmapped);
+    let zola = mapping::decision(&package("zola"));
+    assert_eq!(zola.status, Status::Mapped);
+    assert_eq!(zola.nixpkgs_attribute.as_deref(), Some("zola"));
+}
+
+#[test]
+fn drafts_from_before_catalog_expansion_remain_checkable() {
+    use nixify::inventory::Package;
+    let mut inv = fixture();
+    inv.packages.push(Package {
+        name: "zola".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("draft");
+    output::generate(&inv, &dir).unwrap();
+    fs::remove_file(dir.join("package-decisions.json")).unwrap();
+    let mut previous = mapping::decisions(&inv);
+    previous
+        .iter_mut()
+        .find(|d| d.package == "zola")
+        .unwrap()
+        .nixpkgs_attribute = None;
+    fs::write(dir.join("packages.nix"), output::packages_nix(&previous)).unwrap();
+    let (_, attributes) = nixify::draft::expected_attributes(&dir, &inv).unwrap();
+    assert!(!attributes.contains(&"zola".to_owned()));
+}

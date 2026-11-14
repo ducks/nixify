@@ -34,6 +34,10 @@ pub struct Verification {
     pub nixpkgs_revision: String,
     pub method: String,
     pub limitations: String,
+    #[serde(default)]
+    pub source_homepage: Option<String>,
+    #[serde(default)]
+    pub nixpkgs_homepage: Option<String>,
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -82,6 +86,14 @@ pub fn parse_database(json: &str) -> Result<MappingDatabase, String> {
                     || evidence.limitations.is_empty()
                     || evidence.limitations.len() > 1000
                     || evidence.limitations.chars().any(char::is_control)
+                    || [&evidence.source_homepage, &evidence.nixpkgs_homepage]
+                        .into_iter()
+                        .flatten()
+                        .any(|url| {
+                            url.len() > 2048
+                                || url.chars().any(char::is_control)
+                                || !(url.starts_with("https://") || url.starts_with("http://"))
+                        })
                 {
                     return Err(format!(
                         "invalid verification metadata for {:?}",

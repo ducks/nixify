@@ -1,6 +1,6 @@
 # Package mapping sources
 
-Nixify's curated [Manjaro mappings](../mappings/manjaro.json) are checked into the repository and are validated when the program starts. They are deliberately small. Existing entries record a Nixpkgs revision and a derivation-existence check; this does not establish package equivalence. The revision is the checkout's self-reported revision, not an authenticated identity. The existing entries need more source-package evidence and community review.
+Nixify's curated [Manjaro mappings](../mappings/manjaro.json) are checked into the repository and are validated when the program starts. They are deliberately small. Existing entries record a Nixpkgs revision and a derivation-existence check; this does not establish package equivalence. The revision is the checkout's self-reported revision, not an authenticated identity. Some entries include both source and Nixpkgs homepage references as review evidence; older entries need further source-package evidence and community review.
 
 The optional helper gathers metadata from the [AUR RPC API](https://wiki.archlinux.org/title/Aurweb_RPC_interface) or the [Arch package search API](https://wiki.archlinux.org/title/Official_repositories_web_interface) to help review candidates. It uses Python 3's standard library. First create suggestions using a trusted local Nixpkgs checkout:
 
