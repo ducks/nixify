@@ -773,3 +773,26 @@ fn distribution_mapping_database_requires_safe_unique_evidenced_entries() {
     wrong_distro["distribution"] = serde_json::json!("arch");
     assert!(mapping::parse_database(&wrong_distro.to_string()).is_err());
 }
+
+#[test]
+fn bundled_catalogs_explain_candidates_without_selecting_them() {
+    use nixify::inventory::Package;
+    let package = |name: &str, foreign: bool| Package {
+        name: name.into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign,
+        evidence: vec![],
+    };
+    let repo = mapping::decision(&package("acl", false));
+    assert_eq!(repo.status, Status::Unmapped);
+    assert!(repo
+        .reason
+        .contains("Manjaro repository candidate: Nixpkgs acl"));
+    assert!(repo.nixpkgs_attribute.is_none());
+    let aur = mapping::decision(&package("paru", true));
+    assert_eq!(aur.status, Status::Review);
+    assert!(aur.reason.contains("AUR catalog candidate: Nixpkgs paru"));
+    assert!(aur.nixpkgs_attribute.is_none());
+    assert!(!output::packages_nix(&[repo, aur]).contains("pkgs.\"acl\""));
+}

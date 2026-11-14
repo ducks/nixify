@@ -111,6 +111,41 @@ fn curated(name: &str) -> Option<&'static MappingEntry> {
         .iter()
         .find(|entry| entry.source_package == name)
 }
+
+#[derive(Deserialize)]
+struct AurCandidates {
+    entries: Vec<AurCandidate>,
+}
+
+#[derive(Deserialize)]
+struct AurCandidate {
+    source_package: String,
+    nixpkgs_attribute: String,
+    evidence: String,
+}
+
+fn aur_candidate(name: &str) -> Option<&'static AurCandidate> {
+    static CANDIDATES: std::sync::OnceLock<AurCandidates> = std::sync::OnceLock::new();
+    CANDIDATES
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../mappings/aur-candidates.json"))
+                .expect("bundled AUR candidates must be valid JSON")
+        })
+        .entries
+        .iter()
+        .find(|entry| entry.source_package == name && valid_attribute(&entry.nixpkgs_attribute))
+}
+fn manjaro_candidate(name: &str) -> Option<&'static AurCandidate> {
+    static CANDIDATES: std::sync::OnceLock<AurCandidates> = std::sync::OnceLock::new();
+    CANDIDATES
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../mappings/manjaro-candidates.json"))
+                .expect("bundled Manjaro candidates must be valid JSON")
+        })
+        .entries
+        .iter()
+        .find(|entry| entry.source_package == name && valid_attribute(&entry.nixpkgs_attribute))
+}
 pub fn decision(package: &Package) -> Decision {
     let (status, attr, reason) = if !package.explicitly_installed {
         (
@@ -136,7 +171,17 @@ pub fn decision(package: &Package) -> Decision {
             "No curated mapping available; research and select a replacement manually.",
         )
     };
-    let reason = if status == Status::Mapped {
+    let reason = if status == Status::Unmapped && package.explicitly_installed {
+        match manjaro_candidate(&package.name) {
+            Some(candidate) => format!("Unreviewed Manjaro repository candidate: Nixpkgs {} ({}); verify equivalence, licensing and target availability before explicitly reviewing it.", candidate.nixpkgs_attribute, candidate.evidence),
+            None => reason.to_owned(),
+        }
+    } else if package.explicitly_installed && package.foreign {
+        match aur_candidate(&package.name) {
+            Some(candidate) => format!("{reason} AUR catalog candidate: Nixpkgs {} ({}); verify provenance, equivalence, licensing and target availability before explicitly reviewing it.", candidate.nixpkgs_attribute, candidate.evidence),
+            None => reason.to_owned(),
+        }
+    } else if status == Status::Mapped {
         let evidence = curated(&package.name)
             .and_then(|entry| entry.verification.as_ref())
             .expect("validated package mapping must have verification metadata");
