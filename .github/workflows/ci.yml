@@ -12,6 +12,7 @@ jobs:
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
       - run: python3 -m unittest discover -s tests -p 'test_vm_smoke.py' -v
+      - run: python3 -m unittest discover -s tests -p 'test_enrich_candidates.py' -v
   nix:
     runs-on: ubuntu-latest
     steps:

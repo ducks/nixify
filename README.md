@@ -40,6 +40,8 @@ configuration are not scanned yet. Review the inventory before sharing it. Netwo
 
 ## Review more package mappings
 
+Curated Manjaro mappings live in [mappings/manjaro.json](mappings/manjaro.json). An optional helper can collect public AUR and Arch package metadata for mapping review; see [package sources and contributions](docs/package-sources.md). This lookup is explicitly online and sends selected package names to the chosen registry.
+
 An optional lookup checks unresolved explicit package names against a trusted local Nixpkgs checkout:
 
 ```sh

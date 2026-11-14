@@ -7,4 +7,6 @@
 /.nixify-vm-*/
 __pycache__/
 /suggestions.json
+/aur-evidence.json
+/arch-evidence.json
 /review.json
