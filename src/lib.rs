@@ -1,9 +1,12 @@
 pub mod baseline;
 pub mod desktop;
 pub mod draft;
+pub mod hardware;
 pub mod inventory;
 pub mod manjaro;
 pub mod mapping;
+pub mod network;
 pub mod output;
 pub mod service_mapping;
+pub mod suggest;
 pub mod systemd;

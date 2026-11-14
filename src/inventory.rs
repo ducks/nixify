@@ -10,6 +10,10 @@ pub struct Inventory {
     pub service_scopes: Vec<ServiceScope>,
     #[serde(default)]
     pub desktop: Option<crate::desktop::DesktopInventory>,
+    #[serde(default)]
+    pub hardware: Option<crate::hardware::Hardware>,
+    #[serde(default)]
+    pub networking: Option<crate::network::NetworkInventory>,
     pub warnings: Vec<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +75,16 @@ impl Inventory {
                 self.source.distribution
             ));
         }
+        if self.source.architecture.is_empty()
+            || self.source.architecture.len() > 64
+            || !self
+                .source
+                .architecture
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"_-+".contains(&b))
+        {
+            return Err("invalid source architecture".into());
+        }
         let mut seen = std::collections::BTreeSet::new();
         for package in &self.packages {
             if !valid_package_name(&package.name)
@@ -122,6 +136,60 @@ impl Inventory {
                 {
                     return Err("invalid or duplicate desktop candidate".into());
                 }
+            }
+        }
+        if let Some(hardware) = &self.hardware {
+            if hardware.uefi_visible == Some(false) {
+                return Err("absence of UEFI evidence cannot establish BIOS boot".into());
+            }
+            if hardware
+                .cpu_model
+                .as_ref()
+                .is_some_and(|s| s.is_empty() || s.len() > 256 || s.chars().any(char::is_control))
+            {
+                return Err("invalid CPU model".into());
+            }
+            if let Some(devices) = &hardware.pci_devices {
+                for device in devices {
+                    if !["display", "network"].contains(&device.category.as_str())
+                        || [&device.vendor, &device.model].iter().any(|s| {
+                            s.is_empty() || s.len() > 256 || s.chars().any(char::is_control)
+                        })
+                    {
+                        return Err("invalid PCI device evidence".into());
+                    }
+                }
+            }
+            if let Some(devices) = &hardware.block_devices {
+                for device in devices {
+                    if device.kind.is_empty()
+                        || device.kind == "loop"
+                        || device.kind.len() > 32
+                        || !device.kind.bytes().all(|b| {
+                            b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_'
+                        })
+                        || device
+                            .system_mounts
+                            .iter()
+                            .any(|m| !["/", "/boot", "/boot/efi", "/efi"].contains(&m.as_str()))
+                        || device.filesystem.as_ref().is_some_and(|s| {
+                            s.is_empty()
+                                || s.len() > 256
+                                || !s
+                                    .bytes()
+                                    .all(|b| b.is_ascii_alphanumeric() || b"._+-".contains(&b))
+                        })
+                    {
+                        return Err("invalid or sensitive block device evidence".into());
+                    }
+                }
+            }
+        }
+        if let Some(network) = &self.networking {
+            if network.firewall_packages.iter().any(|p| {
+                !["firewalld", "ufw", "nftables", "iptables", "iptables-nft"].contains(&p.as_str())
+            }) {
+                return Err("invalid firewall package evidence".into());
             }
         }
         Ok(())

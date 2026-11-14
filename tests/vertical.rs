@@ -120,7 +120,7 @@ fn cli_generates_and_reports_without_nix() {
         String::from_utf8_lossy(&status.stderr)
     );
     let text = fs::read_to_string(target.join("packages.nix")).unwrap();
-    assert!(text.contains("    git\n"));
+    assert!(text.contains("    pkgs.\"git\"\n"));
     assert!(!text.contains("foreign-tool"));
     let report = Command::new(binary)
         .args(["report", "--input", file.to_str().unwrap()])
@@ -171,7 +171,7 @@ fn baseline_overlap_does_not_claim_equivalence_or_change_generation() {
     };
     assert_eq!(baseline::matches(&inventory, &baseline), vec!["git"]);
     let before = output::packages_nix(&mapping::decisions(&inventory));
-    assert!(before.contains("    git\n"));
+    assert!(before.contains("    pkgs.\"git\"\n"));
     let temp = tempfile::tempdir().unwrap();
     let inv_path = temp.path().join("inventory.json");
     let baseline_path = temp.path().join("baseline.json");
@@ -254,6 +254,7 @@ fn inventory_from_previous_milestone_is_still_readable() {
     let mut value = serde_json::to_value(fixture()).unwrap();
     value.as_object_mut().unwrap().remove("service_scopes");
     value.as_object_mut().unwrap().remove("desktop");
+    value.as_object_mut().unwrap().remove("hardware");
     let decoded: Inventory = serde_json::from_value(value).unwrap();
     decoded.validate().unwrap();
     assert!(decoded.service_scopes.is_empty());
@@ -457,4 +458,422 @@ fn module_evaluation_requires_explicit_nixpkgs_path() {
         .unwrap();
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("--nixpkgs"));
+}
+
+#[test]
+fn hardware_parsers_retain_relevant_evidence_without_identifiers() {
+    use nixify::hardware;
+    let pci = concat!(
+        "00:1f.6 \"Ethernet controller [0200]\" \"Intel [8086]\" \"Ethernet [15b8]\" -r01\n",
+        "01:00.0 \"VGA compatible controller [0300]\" \"NVIDIA [10de]\" \"Graphics [1c03]\"\n",
+        "00:1f.3 \"Audio device [0403]\" \"Vendor [1234]\" \"Audio [4321]\"\n"
+    );
+    let parsed = hardware::parse_pci(pci).unwrap();
+    assert_eq!(parsed.len(), 2);
+    assert_eq!(parsed[0].category, "display");
+    assert_eq!(parsed[1].category, "network");
+    assert!(!serde_json::to_string(&parsed).unwrap().contains("00:1f.6"));
+    assert!(hardware::parse_pci("malformed output").is_err());
+    let blocks = hardware::parse_lsblk(r#"{"blockdevices":[{"type":"part","fstype":"ext4","size":4096,"mountpoints":["/home/private-user","/"],"uuid":"secret-uuid","name":"secret-device"}]}"#).unwrap();
+    assert_eq!(blocks[0].system_mounts, vec!["/"]);
+    let json = serde_json::to_string(&blocks).unwrap();
+    for private in ["private-user", "secret-uuid", "secret-device"] {
+        assert!(!json.contains(private));
+    }
+    assert!(hardware::parse_lsblk("not-json").is_err());
+    let raid = hardware::parse_lsblk(r#"{"blockdevices":[{"type":"raid1","fstype":null,"size":123,"mountpoints":[]},{"type":"loop","fstype":null,"size":2,"mountpoints":[]}]}"#).unwrap();
+    assert_eq!(raid.len(), 1);
+    assert_eq!(raid[0].kind, "raid1");
+    assert_eq!(
+        hardware::parse_cpu("model name : Example CPU\nSerial : confidential\n").as_deref(),
+        Some("Example CPU")
+    );
+}
+
+#[test]
+fn hardware_inventory_rejects_sensitive_mount_paths() {
+    let mut inv = fixture();
+    inv.hardware = Some(nixify::hardware::Hardware {
+        evidence: vec![],
+        cpu_model: None,
+        uefi_visible: None,
+        pci_devices: None,
+        block_devices: Some(vec![nixify::hardware::BlockDevice {
+            kind: "part".into(),
+            filesystem: Some("ext4".into()),
+            size_bytes: 1,
+            system_mounts: vec!["/home/private-user".into()],
+        }]),
+    });
+    assert!(inv.validate().is_err());
+}
+
+#[test]
+fn networking_summarizes_without_retaining_addresses_or_domains() {
+    use nixify::network;
+    let dns = network::parse_resolver("# test\nsearch private.example\nnameserver 127.0.0.53\nnameserver 192.0.2.42\nnameserver fe80::1%secret-interface\nnameserver secret-invalid\n");
+    assert_eq!(dns.loopback_nameservers, 1);
+    assert_eq!(dns.other_nameservers, 2);
+    assert_eq!(dns.unrecognized_nameservers, 1);
+    let json = serde_json::to_string(&dns).unwrap();
+    for secret in [
+        "private.example",
+        "127.0.0.53",
+        "192.0.2.42",
+        "secret-interface",
+        "secret-invalid",
+    ] {
+        assert!(!json.contains(secret));
+    }
+    let root = tempfile::tempdir().unwrap();
+    for (name, kind, wireless) in [
+        ("lo-secret", "772", false),
+        ("wifi-secret", "1", true),
+        ("vpn-secret", "65534", false),
+    ] {
+        let dir = root.path().join(name);
+        fs::create_dir(&dir).unwrap();
+        fs::write(dir.join("type"), kind).unwrap();
+        if wireless {
+            fs::create_dir(dir.join("wireless")).unwrap();
+        }
+    }
+    let summary = network::interface_summary(root.path()).unwrap();
+    assert_eq!(summary.loopback, 1);
+    assert_eq!(summary.wireless, 1);
+    assert_eq!(summary.other, 1);
+    let json = serde_json::to_string(&summary).unwrap();
+    assert!(!json.contains("secret"));
+    fs::write(root.path().join("wifi-secret/type"), "invalid").unwrap();
+    assert!(network::interface_summary(root.path()).is_err());
+}
+
+#[test]
+fn missing_network_field_in_old_inventories_is_supported() {
+    let mut value = serde_json::to_value(fixture()).unwrap();
+    value.as_object_mut().unwrap().remove("networking");
+    let inventory: Inventory = serde_json::from_value(value).unwrap();
+    assert!(inventory.networking.is_none());
+    assert!(inventory.validate().is_ok());
+}
+
+#[test]
+fn suggestions_are_unreviewed_and_preserve_foreign_status() {
+    use std::collections::BTreeMap;
+    let inventory = fixture();
+    let results = BTreeMap::from([
+        ("base-devel".to_string(), false),
+        ("foreign-tool".to_string(), true),
+    ]);
+    let report = nixify::suggest::report_from_results(
+        &inventory,
+        std::path::Path::new("/nixpkgs"),
+        None,
+        "x86_64-linux",
+        results,
+    )
+    .unwrap();
+    assert_eq!(report.suggestions.len(), 2);
+    let foreign = report
+        .suggestions
+        .iter()
+        .find(|x| x.source_package == "foreign-tool")
+        .unwrap();
+    assert!(foreign.foreign && foreign.attribute_exists);
+    assert_eq!(foreign.classification, "unreviewed_exact_name_match");
+    assert!(report.warning.contains("No mappings were accepted"));
+    assert!(nixify::suggest::report_from_results(
+        &inventory,
+        std::path::Path::new("/nixpkgs"),
+        None,
+        "x86_64-linux",
+        BTreeMap::new()
+    )
+    .is_err());
+}
+
+#[test]
+fn reviewed_mapping_is_explicit_safe_and_revalidated() {
+    use nixify::mapping::{ReviewedMapping, ReviewedMappings};
+    let inventory = fixture();
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    let review = ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: Some(revision.into()),
+        mappings: vec![ReviewedMapping {
+            source_package: "foreign-tool".into(),
+            nixpkgs_attribute: "htop".into(),
+        }],
+    };
+    let decisions = mapping::reviewed_decisions(&inventory, &review, Some(revision)).unwrap();
+    assert_eq!(
+        decisions
+            .iter()
+            .find(|d| d.package == "foreign-tool")
+            .unwrap()
+            .status,
+        Status::Reviewed
+    );
+    output::generate_with_review(&inventory, &dir, revision, &review).unwrap();
+    let module = fs::read_to_string(dir.join("packages.nix")).unwrap();
+    assert!(module.contains("pkgs.\"htop\""));
+    assert!(dir.join("reviewed-mappings.json").exists());
+    let (_, attrs) = nixify::draft::expected_attributes(&dir, &inventory).unwrap();
+    assert!(attrs.contains(&"htop".into()));
+    assert!(fs::read_to_string(dir.join("migration-report.md"))
+        .unwrap()
+        .contains("User-reviewed mapping"));
+}
+
+#[test]
+fn reviewed_mappings_reject_injection_duplicates_dependencies_and_wrong_revision() {
+    use nixify::mapping::{ReviewedMapping, ReviewedMappings};
+    let inventory = fixture();
+    let item = |source: &str, attr: &str| ReviewedMapping {
+        source_package: source.into(),
+        nixpkgs_attribute: attr.into(),
+    };
+    let check = |mappings, revision: Option<&str>| ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: revision.map(str::to_owned),
+        mappings,
+    };
+    let target = "0123456789abcdef0123456789abcdef01234567";
+    for review in [
+        check(vec![item("git", "x\"; builtins.abort \"bad")], None),
+        check(vec![item("git", "htop"), item("git", "git")], None),
+        check(vec![item("libexample", "htop")], None),
+        check(vec![item("missing", "htop")], None),
+        check(
+            vec![item("git", "htop")],
+            Some("ffffffffffffffffffffffffffffffffffffffff"),
+        ),
+    ] {
+        assert!(mapping::reviewed_decisions(&inventory, &review, Some(target)).is_err());
+    }
+}
+
+#[test]
+fn cli_generate_accepts_only_explicitly_reviewed_mappings() {
+    let temp = tempfile::tempdir().unwrap();
+    let inventory = fixture();
+    let input = temp.path().join("inventory.json");
+    let review = temp.path().join("review.json");
+    let dir = temp.path().join("draft");
+    fs::write(&input, serde_json::to_vec(&inventory).unwrap()).unwrap();
+    fs::write(&review, r#"{"schema_version":1,"mappings":[{"source_package":"foreign-tool","nixpkgs_attribute":"htop"}]}"#).unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args([
+            "generate",
+            "--input",
+            input.to_str().unwrap(),
+            "--output",
+            dir.to_str().unwrap(),
+            "--reviewed-mappings",
+            review.to_str().unwrap(),
+        ])
+        .env("PATH", "")
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(fs::read_to_string(dir.join("packages.nix"))
+        .unwrap()
+        .contains("pkgs.\"htop\""));
+    assert!(nixify::draft::expected_attributes(&dir, &inventory)
+        .unwrap()
+        .1
+        .contains(&"htop".into()));
+}
+
+#[test]
+fn validation_accepts_legacy_generated_package_module() {
+    let inv = fixture();
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("draft");
+    output::generate(&inv, &dir).unwrap();
+    let legacy = "# Migration draft. Curated mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n    git\n    neovim\n  ];\n}\n";
+    fs::write(dir.join("packages.nix"), legacy).unwrap();
+    assert_eq!(
+        nixify::draft::expected_attributes(&dir, &inv).unwrap().1,
+        vec!["git", "neovim"]
+    );
+}
+
+#[test]
+fn curated_mappings_handle_different_names_without_promoting_dependencies_or_foreign_packages() {
+    use nixify::inventory::Package;
+    let package = |name: &str, explicit: bool, foreign: bool| Package {
+        name: name.into(),
+        version: "1".into(),
+        explicitly_installed: explicit,
+        foreign,
+        evidence: vec![],
+    };
+    let make = mapping::decision(&package("make", true, false));
+    assert_eq!(make.nixpkgs_attribute.as_deref(), Some("gnumake"));
+    assert_eq!(
+        mapping::decision(&package("tmux", false, false)).status,
+        Status::Dependency
+    );
+    assert_eq!(
+        mapping::decision(&package("tmux", true, true)).status,
+        Status::Review
+    );
+    assert_eq!(
+        mapping::decision(&package("unrecognized-package", true, false)).status,
+        Status::Unmapped
+    );
+}
+
+#[test]
+fn old_drafts_remain_verifiable_after_curated_mappings_expand() {
+    use nixify::inventory::Package;
+    let mut inv = fixture();
+    inv.packages.push(Package {
+        name: "tmux".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    output::generate(&inv, &dir).unwrap();
+    let legacy = "# Migration draft. Curated mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n    git\n    neovim\n  ];\n}\n";
+    fs::write(dir.join("packages.nix"), legacy).unwrap();
+    let (_, attrs) = nixify::draft::expected_attributes(&dir, &inv).unwrap();
+    assert_eq!(attrs, vec!["git", "neovim"]);
+}
+
+#[test]
+fn distribution_mapping_database_requires_safe_unique_evidenced_entries() {
+    let source = include_str!("../mappings/manjaro.json");
+    let original: serde_json::Value = serde_json::from_str(source).unwrap();
+    let db = mapping::parse_database(source).unwrap();
+    assert_eq!(db.distribution, "manjaro");
+    assert!(db.entries.iter().any(|entry| entry.source_package == "make"
+        && entry.nixpkgs_attribute.as_deref() == Some("gnumake")));
+    let mut duplicate = original.clone();
+    let entry = duplicate["entries"][0].clone();
+    duplicate["entries"].as_array_mut().unwrap().push(entry);
+    assert!(mapping::parse_database(&duplicate.to_string()).is_err());
+    let mut injection = original.clone();
+    injection["entries"][0]["nixpkgs_attribute"] = serde_json::json!("evil\"; builtins.abort \"no");
+    assert!(mapping::parse_database(&injection.to_string()).is_err());
+    let mut no_evidence = original.clone();
+    no_evidence["entries"][0]["verification"] = serde_json::Value::Null;
+    assert!(mapping::parse_database(&no_evidence.to_string()).is_err());
+    let mut wrong_distro = original;
+    wrong_distro["distribution"] = serde_json::json!("arch");
+    assert!(mapping::parse_database(&wrong_distro.to_string()).is_err());
+}
+
+#[test]
+fn strong_catalog_matches_are_inferred_and_weak_matches_remain_unresolved() {
+    use nixify::inventory::Package;
+    let package = |name: &str, foreign: bool, explicit: bool| Package {
+        name: name.into(),
+        version: "1".into(),
+        explicitly_installed: explicit,
+        foreign,
+        evidence: vec![],
+    };
+    let repo = mapping::decision(&package("acl", false, true));
+    assert_eq!(repo.status, Status::Inferred);
+    assert!(repo.reason.contains("same name and upstream homepage"));
+    assert_eq!(repo.nixpkgs_attribute.as_deref(), Some("acl"));
+    let aur = mapping::decision(&package("paru", true, true));
+    assert_eq!(aur.status, Status::Inferred);
+    assert!(aur.reason.contains("does not prove AUR provenance"));
+    assert_eq!(
+        mapping::decision(&package("android-studio", true, true)).status,
+        Status::Review
+    );
+    assert_eq!(
+        mapping::decision(&package("acl", false, false)).status,
+        Status::Dependency
+    );
+    assert!(output::packages_nix(&[repo, aur]).contains("pkgs.\"acl\""));
+}
+
+#[test]
+fn generated_inferences_are_snapshotted_and_reject_unsafe_edits() {
+    use nixify::inventory::Package;
+    let mut inv = fixture();
+    inv.packages.push(Package {
+        name: "acl".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("draft");
+    output::generate(&inv, &dir).unwrap();
+    let report = fs::read_to_string(dir.join("migration-report.md")).unwrap();
+    assert!(report.contains("Inferred mappings"));
+    assert!(nixify::draft::expected_attributes(&dir, &inv)
+        .unwrap()
+        .1
+        .contains(&"acl".to_owned()));
+    let path = dir.join("package-decisions.json");
+    let mut decisions: serde_json::Value =
+        serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    let entry = decisions
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|d| d["package"] == "acl")
+        .unwrap();
+    entry["nixpkgs_attribute"] = serde_json::json!("evil\"; builtins.abort \"bad");
+    fs::write(path, decisions.to_string()).unwrap();
+    assert!(nixify::draft::expected_attributes(&dir, &inv).is_err());
+}
+
+#[test]
+fn same_name_collision_stays_unmapped_and_known_tools_are_curated() {
+    use nixify::inventory::Package;
+    let package = |name: &str| Package {
+        name: name.into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    };
+    assert_eq!(mapping::decision(&package("exo")).status, Status::Unmapped);
+    let zola = mapping::decision(&package("zola"));
+    assert_eq!(zola.status, Status::Mapped);
+    assert_eq!(zola.nixpkgs_attribute.as_deref(), Some("zola"));
+}
+
+#[test]
+fn drafts_from_before_catalog_expansion_remain_checkable() {
+    use nixify::inventory::Package;
+    let mut inv = fixture();
+    inv.packages.push(Package {
+        name: "zola".into(),
+        version: "1".into(),
+        explicitly_installed: true,
+        foreign: false,
+        evidence: vec![],
+    });
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("draft");
+    output::generate(&inv, &dir).unwrap();
+    fs::remove_file(dir.join("package-decisions.json")).unwrap();
+    let mut previous = mapping::decisions(&inv);
+    previous
+        .iter_mut()
+        .find(|d| d.package == "zola")
+        .unwrap()
+        .nixpkgs_attribute = None;
+    fs::write(dir.join("packages.nix"), output::packages_nix(&previous)).unwrap();
+    let (_, attributes) = nixify::draft::expected_attributes(&dir, &inv).unwrap();
+    assert!(!attributes.contains(&"zola".to_owned()));
 }

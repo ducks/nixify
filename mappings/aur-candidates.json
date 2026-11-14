@@ -1,0 +1,1138 @@
+{
+  "schema_version": 1,
+  "registry": "aur",
+  "nixpkgs_declared_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+  "aur_archive_sha256": "44bd3a959c1e9c1c2a5af89e786901c6a528d5b54d8b9db4ebb698c3f3703bfa",
+  "selection": "top 1000 by AUR popularity score",
+  "warning": "Candidates only. Foreign does not prove AUR provenance; matching names or homepages do not prove equivalence, licensing, availability, or configuration compatibility.",
+  "entries": [
+    {
+      "source_package": "adwaita-qt6",
+      "nixpkgs_attribute": "adwaita-qt6",
+      "aur_rank": 146,
+      "source_homepage": "https://github.com/FedoraQt/adwaita-qt",
+      "nixpkgs_homepage": "https://github.com/FedoraQt/adwaita-qt",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "android-studio",
+      "nixpkgs_attribute": "android-studio",
+      "aur_rank": 20,
+      "source_homepage": "https://developer.android.com/",
+      "nixpkgs_homepage": "https://developer.android.com/studio/index.html",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "ani-cli",
+      "nixpkgs_attribute": "ani-cli",
+      "aur_rank": 222,
+      "source_homepage": "https://github.com/pystardust/ani-cli",
+      "nixpkgs_homepage": "https://github.com/pystardust/ani-cli",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "arc-icon-theme",
+      "nixpkgs_attribute": "arc-icon-theme",
+      "aur_rank": 247,
+      "source_homepage": "https://github.com/horst3180/arc-icon-theme",
+      "nixpkgs_homepage": "https://github.com/horst3180/arc-icon-theme",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "aseprite",
+      "nixpkgs_attribute": "aseprite",
+      "aur_rank": 134,
+      "source_homepage": "https://www.aseprite.org/",
+      "nixpkgs_homepage": "https://www.aseprite.org/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ashuffle",
+      "nixpkgs_attribute": "ashuffle",
+      "aur_rank": 896,
+      "source_homepage": "https://github.com/joshkunz/ashuffle",
+      "nixpkgs_homepage": "https://github.com/joshkunz/ashuffle",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "auto-cpufreq",
+      "nixpkgs_attribute": "auto-cpufreq",
+      "aur_rank": 609,
+      "source_homepage": "https://github.com/AdnanHodzic/auto-cpufreq",
+      "nixpkgs_homepage": "https://github.com/AdnanHodzic/auto-cpufreq",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "backrest",
+      "nixpkgs_attribute": "backrest",
+      "aur_rank": 407,
+      "source_homepage": "https://github.com/garethgeorge/backrest",
+      "nixpkgs_homepage": "https://github.com/garethgeorge/backrest",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "bambu-studio",
+      "nixpkgs_attribute": "bambu-studio",
+      "aur_rank": 818,
+      "source_homepage": "https://github.com/bambulab/BambuStudio",
+      "nixpkgs_homepage": "https://github.com/bambulab/BambuStudio",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "basedpyright",
+      "nixpkgs_attribute": "basedpyright",
+      "aur_rank": 433,
+      "source_homepage": "https://docs.basedpyright.com/",
+      "nixpkgs_homepage": "https://github.com/detachhead/basedpyright",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "bitwig-studio",
+      "nixpkgs_attribute": "bitwig-studio",
+      "aur_rank": 757,
+      "source_homepage": "https://www.bitwig.com/",
+      "nixpkgs_homepage": "https://www.bitwig.com/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "bottles",
+      "nixpkgs_attribute": "bottles",
+      "aur_rank": 574,
+      "source_homepage": "https://github.com/bottlesdevs/Bottles",
+      "nixpkgs_homepage": "https://usebottles.com/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "bridge-utils",
+      "nixpkgs_attribute": "bridge-utils",
+      "aur_rank": 262,
+      "source_homepage": "https://wiki.linuxfoundation.org/networking/bridge",
+      "nixpkgs_homepage": "https://wiki.linuxfoundation.org/networking/bridge",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "brlaser",
+      "nixpkgs_attribute": "brlaser",
+      "aur_rank": 198,
+      "source_homepage": "https://github.com/Owl-Maintain/brlaser",
+      "nixpkgs_homepage": "https://github.com/pdewacht/brlaser",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "brscan4",
+      "nixpkgs_attribute": "brscan4",
+      "aur_rank": 193,
+      "source_homepage": "http://support.brother.com",
+      "nixpkgs_homepage": "http://www.brother.com",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "byobu",
+      "nixpkgs_attribute": "byobu",
+      "aur_rank": 228,
+      "source_homepage": "https://byobu.org/",
+      "nixpkgs_homepage": "https://www.byobu.org/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "cask",
+      "nixpkgs_attribute": "cask",
+      "aur_rank": 872,
+      "source_homepage": "https://github.com/cask/cask",
+      "nixpkgs_homepage": "https://github.com/cask/cask",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "cbonsai",
+      "nixpkgs_attribute": "cbonsai",
+      "aur_rank": 382,
+      "source_homepage": "https://gitlab.com/jallbrit/cbonsai",
+      "nixpkgs_homepage": "https://gitlab.com/jallbrit/cbonsai",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "cryptomator",
+      "nixpkgs_attribute": "cryptomator",
+      "aur_rank": 725,
+      "source_homepage": "https://cryptomator.org/",
+      "nixpkgs_homepage": "https://cryptomator.org",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "cubeb",
+      "nixpkgs_attribute": "cubeb",
+      "aur_rank": 680,
+      "source_homepage": "https://github.com/mozilla/cubeb",
+      "nixpkgs_homepage": "https://github.com/mozilla/cubeb",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "davinci-resolve",
+      "nixpkgs_attribute": "davinci-resolve",
+      "aur_rank": 702,
+      "source_homepage": "https://www.blackmagicdesign.com/support/family/davinci-resolve-and-fusion",
+      "nixpkgs_homepage": "https://www.blackmagicdesign.com/products/davinciresolve",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "davinci-resolve-studio",
+      "nixpkgs_attribute": "davinci-resolve-studio",
+      "aur_rank": 393,
+      "source_homepage": "https://www.blackmagicdesign.com/support/family/davinci-resolve-and-fusion",
+      "nixpkgs_homepage": "https://www.blackmagicdesign.com/products/davinciresolve",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "davmail",
+      "nixpkgs_attribute": "davmail",
+      "aur_rank": 650,
+      "source_homepage": "http://davmail.sourceforge.net/",
+      "nixpkgs_homepage": "https://davmail.sourceforge.net/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "deadbeef",
+      "nixpkgs_attribute": "deadbeef",
+      "aur_rank": 530,
+      "source_homepage": "https://github.com/DeaDBeeF-Player/deadbeef",
+      "nixpkgs_homepage": "http://deadbeef.sourceforge.net/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "displaylink",
+      "nixpkgs_attribute": "displaylink",
+      "aur_rank": 211,
+      "source_homepage": "https://www.synaptics.com/products/displaylink-graphics",
+      "nixpkgs_homepage": "https://www.displaylink.com/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "dr14_tmeter",
+      "nixpkgs_attribute": "dr14_tmeter",
+      "aur_rank": 547,
+      "source_homepage": "https://github.com/simon-r/dr14_t.meter",
+      "nixpkgs_homepage": "http://dr14tmeter.sourceforge.net/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "dsda-doom",
+      "nixpkgs_attribute": "dsda-doom",
+      "aur_rank": 622,
+      "source_homepage": "https://github.com/dsda-org/dsda-doom",
+      "nixpkgs_homepage": "https://github.com/kraflab/dsda-doom",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "eww",
+      "nixpkgs_attribute": "eww",
+      "aur_rank": 521,
+      "source_homepage": "https://github.com/elkowar/eww",
+      "nixpkgs_homepage": "https://github.com/elkowar/eww",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "extest",
+      "nixpkgs_attribute": "extest",
+      "aur_rank": 270,
+      "source_homepage": "https://github.com/Supreeeme/extest",
+      "nixpkgs_homepage": "https://github.com/Supreeeme/extest",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "fan2go",
+      "nixpkgs_attribute": "fan2go",
+      "aur_rank": 929,
+      "source_homepage": "https://github.com/markusressel/fan2go",
+      "nixpkgs_homepage": "https://github.com/markusressel/fan2go",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "fava",
+      "nixpkgs_attribute": "fava",
+      "aur_rank": 243,
+      "source_homepage": "https://github.com/beancount/fava",
+      "nixpkgs_homepage": "https://beancount.github.io/fava",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "flacon",
+      "nixpkgs_attribute": "flacon",
+      "aur_rank": 674,
+      "source_homepage": "https://github.com/flacon/flacon",
+      "nixpkgs_homepage": "https://flacon.github.io/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "fluffychat",
+      "nixpkgs_attribute": "fluffychat",
+      "aur_rank": 577,
+      "source_homepage": "https://github.com/krille-chan/fluffychat",
+      "nixpkgs_homepage": "https://fluffychat.im/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "freetube",
+      "nixpkgs_attribute": "freetube",
+      "aur_rank": 192,
+      "source_homepage": "https://freetubeapp.io",
+      "nixpkgs_homepage": "https://freetubeapp.io/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "gallery-dl",
+      "nixpkgs_attribute": "gallery-dl",
+      "aur_rank": 182,
+      "source_homepage": "https://codeberg.org/mikf/gallery-dl",
+      "nixpkgs_homepage": "https://github.com/mikf/gallery-dl",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "gapless",
+      "nixpkgs_attribute": "gapless",
+      "aur_rank": 507,
+      "source_homepage": "https://gitlab.gnome.org/neithern/g4music",
+      "nixpkgs_homepage": "https://gitlab.gnome.org/neithern/g4music",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "gdmap",
+      "nixpkgs_attribute": "gdmap",
+      "aur_rank": 883,
+      "source_homepage": "https://gitlab.com/sjohannes/gdmap",
+      "nixpkgs_homepage": "https://gdmap.sourceforge.net",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "git-credential-keepassxc",
+      "nixpkgs_attribute": "git-credential-keepassxc",
+      "aur_rank": 385,
+      "source_homepage": "https://github.com/Frederick888/git-credential-keepassxc",
+      "nixpkgs_homepage": "https://github.com/Frederick888/git-credential-keepassxc",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "google-chrome",
+      "nixpkgs_attribute": "google-chrome",
+      "aur_rank": 12,
+      "source_homepage": "https://www.google.com/chrome",
+      "nixpkgs_homepage": "https://www.google.com/chrome/browser/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "gtk-engine-murrine",
+      "nixpkgs_attribute": "gtk-engine-murrine",
+      "aur_rank": 106,
+      "source_homepage": "http://cimitan.com/murrine/project/murrine",
+      "nixpkgs_homepage": "https://gitlab.gnome.org/Archive/murrine",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "gtk2",
+      "nixpkgs_attribute": "gtk2",
+      "aur_rank": 18,
+      "source_homepage": "https://www.gtk.org/",
+      "nixpkgs_homepage": "https://www.gtk.org/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "hexchat",
+      "nixpkgs_attribute": "hexchat",
+      "aur_rank": 420,
+      "source_homepage": "https://hexchat.github.io/",
+      "nixpkgs_homepage": "https://hexchat.github.io/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "http-parser",
+      "nixpkgs_attribute": "http-parser",
+      "aur_rank": 376,
+      "source_homepage": "https://github.com/nodejs/http-parser",
+      "nixpkgs_homepage": "https://github.com/nodejs/http-parser",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "imhex",
+      "nixpkgs_attribute": "imhex",
+      "aur_rank": 651,
+      "source_homepage": "https://imhex.werwolv.net",
+      "nixpkgs_homepage": "https://github.com/WerWolv/ImHex",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "immich-cli",
+      "nixpkgs_attribute": "immich-cli",
+      "aur_rank": 323,
+      "source_homepage": "https://github.com/immich-app/immich",
+      "nixpkgs_homepage": "https://immich.app/docs/features/command-line-interface",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "include-what-you-use",
+      "nixpkgs_attribute": "include-what-you-use",
+      "aur_rank": 827,
+      "source_homepage": "https://include-what-you-use.org",
+      "nixpkgs_homepage": "https://include-what-you-use.org",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "jan",
+      "nixpkgs_attribute": "jan",
+      "aur_rank": 741,
+      "source_homepage": "https://jan.ai/",
+      "nixpkgs_homepage": "https://github.com/janhq/jan",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "jetbrains-toolbox",
+      "nixpkgs_attribute": "jetbrains-toolbox",
+      "aur_rank": 121,
+      "source_homepage": "https://www.jetbrains.com/toolbox/",
+      "nixpkgs_homepage": "https://jetbrains.com/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "joplin",
+      "nixpkgs_attribute": "joplin",
+      "aur_rank": 149,
+      "source_homepage": "https://joplinapp.org/",
+      "nixpkgs_homepage": "https://github.com/laurent22/joplin#readme",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "joplin-desktop",
+      "nixpkgs_attribute": "joplin-desktop",
+      "aur_rank": 150,
+      "source_homepage": "https://joplinapp.org/",
+      "nixpkgs_homepage": "https://joplinapp.org",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "k3s",
+      "nixpkgs_attribute": "k3s",
+      "aur_rank": 585,
+      "source_homepage": "https://k3s.io",
+      "nixpkgs_homepage": "https://k3s.io",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "kdotool",
+      "nixpkgs_attribute": "kdotool",
+      "aur_rank": 739,
+      "source_homepage": "https://github.com/jinliu/kdotool/",
+      "nixpkgs_homepage": "https://github.com/jinliu/kdotool",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ktailctl",
+      "nixpkgs_attribute": "ktailctl",
+      "aur_rank": 728,
+      "source_homepage": "https://github.com/f-koehler/KTailctl",
+      "nixpkgs_homepage": "https://github.com/f-koehler/KTailctl",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ktls-utils",
+      "nixpkgs_attribute": "ktls-utils",
+      "aur_rank": 557,
+      "source_homepage": "https://github.com/oracle/ktls-utils",
+      "nixpkgs_homepage": "https://github.com/oracle/ktls-utils",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "kubelogin",
+      "nixpkgs_attribute": "kubelogin",
+      "aur_rank": 532,
+      "source_homepage": "https://github.com/int128/kubelogin",
+      "nixpkgs_homepage": "https://github.com/Azure/kubelogin",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "ladybird",
+      "nixpkgs_attribute": "ladybird",
+      "aur_rank": 122,
+      "source_homepage": "https://github.com/LadybirdBrowser/ladybird",
+      "nixpkgs_homepage": "https://ladybird.dev",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "libbdplus",
+      "nixpkgs_attribute": "libbdplus",
+      "aur_rank": 800,
+      "source_homepage": "https://www.videolan.org/developers/libbdplus.html",
+      "nixpkgs_homepage": "http://www.videolan.org/developers/libbdplus.html",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "libcutl",
+      "nixpkgs_attribute": "libcutl",
+      "aur_rank": 724,
+      "source_homepage": "https://www.codesynthesis.com/projects/libcutl/",
+      "nixpkgs_homepage": "https://codesynthesis.com/projects/libcutl/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "libresplit",
+      "nixpkgs_attribute": "libresplit",
+      "aur_rank": 966,
+      "source_homepage": "https://libresplit.org",
+      "nixpkgs_homepage": "https://github.com/wins1ey/LibreSplit",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "libsoup",
+      "nixpkgs_attribute": "libsoup",
+      "aur_rank": 51,
+      "source_homepage": "https://wiki.gnome.org/Projects/libsoup",
+      "nixpkgs_homepage": "https://gitlab.gnome.org/GNOME/libsoup",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "localsend",
+      "nixpkgs_attribute": "localsend",
+      "aur_rank": 44,
+      "source_homepage": "https://github.com/localsend/localsend",
+      "nixpkgs_homepage": "https://localsend.org/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "losslesscut-bin",
+      "nixpkgs_attribute": "losslesscut-bin",
+      "aur_rank": 73,
+      "source_homepage": "https://github.com/mifi/lossless-cut",
+      "nixpkgs_homepage": "https://mifi.no/losslesscut/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "lrcget",
+      "nixpkgs_attribute": "lrcget",
+      "aur_rank": 383,
+      "source_homepage": "https://github.com/tranxuanthang/lrcget",
+      "nixpkgs_homepage": "https://github.com/tranxuanthang/lrcget",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ludusavi",
+      "nixpkgs_attribute": "ludusavi",
+      "aur_rank": 782,
+      "source_homepage": "https://github.com/mtkennerly/ludusavi",
+      "nixpkgs_homepage": "https://github.com/mtkennerly/ludusavi",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "magika",
+      "nixpkgs_attribute": "magika",
+      "aur_rank": 743,
+      "source_homepage": "https://github.com/google/magika",
+      "nixpkgs_homepage": "https://github.com/google/magika",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "makemkv",
+      "nixpkgs_attribute": "makemkv",
+      "aur_rank": 350,
+      "source_homepage": "https://www.makemkv.com",
+      "nixpkgs_homepage": "http://makemkv.com",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "mcaselector",
+      "nixpkgs_attribute": "mcaselector",
+      "aur_rank": 867,
+      "source_homepage": "https://github.com/Querz/mcaselector",
+      "nixpkgs_homepage": "https://github.com/Querz/mcaselector",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "mcomix",
+      "nixpkgs_attribute": "mcomix",
+      "aur_rank": 646,
+      "source_homepage": "https://sourceforge.net/p/mcomix/wiki/Home/",
+      "nixpkgs_homepage": "https://sourceforge.net/projects/mcomix/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "mdcat",
+      "nixpkgs_attribute": "mdcat",
+      "aur_rank": 290,
+      "source_homepage": "https://github.com/BIRSAx2/mdcat",
+      "nixpkgs_homepage": "https://github.com/swsnr/mdcat",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "mimeo",
+      "nixpkgs_attribute": "mimeo",
+      "aur_rank": 459,
+      "source_homepage": "https://xyne.dev/projects/mimeo",
+      "nixpkgs_homepage": "https://xyne.dev/projects/mimeo/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "mindustry",
+      "nixpkgs_attribute": "mindustry",
+      "aur_rank": 586,
+      "source_homepage": "https://github.com/Anuken/Mindustry",
+      "nixpkgs_homepage": "https://mindustrygame.github.io/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "mindustry-server",
+      "nixpkgs_attribute": "mindustry-server",
+      "aur_rank": 587,
+      "source_homepage": "https://github.com/Anuken/Mindustry",
+      "nixpkgs_homepage": "https://mindustrygame.github.io/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "monado",
+      "nixpkgs_attribute": "monado",
+      "aur_rank": 499,
+      "source_homepage": "https://monado.dev/",
+      "nixpkgs_homepage": "https://monado.freedesktop.org/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "naps2",
+      "nixpkgs_attribute": "naps2",
+      "aur_rank": 468,
+      "source_homepage": "https://www.naps2.com",
+      "nixpkgs_homepage": "https://www.naps2.com",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "nautilus-open-any-terminal",
+      "nixpkgs_attribute": "nautilus-open-any-terminal",
+      "aur_rank": 378,
+      "source_homepage": "https://github.com/Stunkymonkey/nautilus-open-any-terminal",
+      "nixpkgs_homepage": "https://github.com/Stunkymonkey/nautilus-open-any-terminal",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "neocmakelsp",
+      "nixpkgs_attribute": "neocmakelsp",
+      "aur_rank": 277,
+      "source_homepage": "https://github.com/neocmakelsp/neocmakelsp",
+      "nixpkgs_homepage": "https://github.com/Decodetalkers/neocmakelsp",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "neofetch",
+      "nixpkgs_attribute": "neofetch",
+      "aur_rank": 70,
+      "source_homepage": "https://github.com/dylanaraps/neofetch",
+      "nixpkgs_homepage": "https://github.com/dylanaraps/neofetch",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "netbird",
+      "nixpkgs_attribute": "netbird",
+      "aur_rank": 147,
+      "source_homepage": "https://netbird.io",
+      "nixpkgs_homepage": "https://netbird.io",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "nomacs",
+      "nixpkgs_attribute": "nomacs",
+      "aur_rank": 329,
+      "source_homepage": "https://github.com/nomacs/nomacs",
+      "nixpkgs_homepage": "https://nomacs.org",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "nvimpager",
+      "nixpkgs_attribute": "nvimpager",
+      "aur_rank": 626,
+      "source_homepage": "https://github.com/lucc/nvimpager",
+      "nixpkgs_homepage": "https://github.com/lucc/nvimpager",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ocrmypdf",
+      "nixpkgs_attribute": "ocrmypdf",
+      "aur_rank": 503,
+      "source_homepage": "https://github.com/ocrmypdf/OCRmyPDF",
+      "nixpkgs_homepage": "https://github.com/ocrmypdf/OCRmyPDF",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "octoprint",
+      "nixpkgs_attribute": "octoprint",
+      "aur_rank": 991,
+      "source_homepage": "https://octoprint.org/",
+      "nixpkgs_homepage": "https://octoprint.org/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "onlyoffice-bin",
+      "nixpkgs_attribute": "onlyoffice-bin",
+      "aur_rank": 130,
+      "source_homepage": "https://www.onlyoffice.com/",
+      "nixpkgs_homepage": "https://www.onlyoffice.com/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "opensoundmeter",
+      "nixpkgs_attribute": "opensoundmeter",
+      "aur_rank": 873,
+      "source_homepage": "https://opensoundmeter.com",
+      "nixpkgs_homepage": "https://opensoundmeter.com/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "openutau",
+      "nixpkgs_attribute": "openutau",
+      "aur_rank": 868,
+      "source_homepage": "https://github.com/openutau/OpenUtau",
+      "nixpkgs_homepage": "http://www.openutau.com/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "orca-slicer",
+      "nixpkgs_attribute": "orca-slicer",
+      "aur_rank": 238,
+      "source_homepage": "https://github.com/OrcaSlicer/OrcaSlicer",
+      "nixpkgs_homepage": "https://github.com/SoftFever/OrcaSlicer",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "osu-lazer-bin",
+      "nixpkgs_attribute": "osu-lazer-bin",
+      "aur_rank": 75,
+      "source_homepage": "https://osu.ppy.sh",
+      "nixpkgs_homepage": "https://osu.ppy.sh",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ov",
+      "nixpkgs_attribute": "ov",
+      "aur_rank": 748,
+      "source_homepage": "https://github.com/noborus/ov",
+      "nixpkgs_homepage": "https://noborus.github.io/ov",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "oversteer",
+      "nixpkgs_attribute": "oversteer",
+      "aur_rank": 380,
+      "source_homepage": "https://github.com/berarma/oversteer",
+      "nixpkgs_homepage": "https://github.com/berarma/oversteer",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "paps",
+      "nixpkgs_attribute": "paps",
+      "aur_rank": 569,
+      "source_homepage": "https://github.com/dov/paps",
+      "nixpkgs_homepage": "https://github.com/dov/paps",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "paru",
+      "nixpkgs_attribute": "paru",
+      "aur_rank": 2,
+      "source_homepage": "https://github.com/morganamilo/paru",
+      "nixpkgs_homepage": "https://github.com/Morganamilo/paru",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "playwright",
+      "nixpkgs_attribute": "playwright",
+      "aur_rank": 727,
+      "source_homepage": "https://playwright.dev",
+      "nixpkgs_homepage": "https://github.com/microsoft/playwright-python",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "polychromatic",
+      "nixpkgs_attribute": "polychromatic",
+      "aur_rank": 466,
+      "source_homepage": "https://github.com/polychromatic/polychromatic",
+      "nixpkgs_homepage": "https://polychromatic.app/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "powershell",
+      "nixpkgs_attribute": "powershell",
+      "aur_rank": 208,
+      "source_homepage": "https://microsoft.com/PowerShell",
+      "nixpkgs_homepage": "https://microsoft.com/PowerShell",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "protonplus",
+      "nixpkgs_attribute": "protonplus",
+      "aur_rank": 123,
+      "source_homepage": "https://github.com/Vysp3r/ProtonPlus",
+      "nixpkgs_homepage": "https://github.com/Vysp3r/ProtonPlus",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "protonup-qt",
+      "nixpkgs_attribute": "protonup-qt",
+      "aur_rank": 197,
+      "source_homepage": "https://davidotek.github.io/protonup-qt",
+      "nixpkgs_homepage": "https://davidotek.github.io/protonup-qt/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "pwvucontrol",
+      "nixpkgs_attribute": "pwvucontrol",
+      "aur_rank": 471,
+      "source_homepage": "https://github.com/saivert/pwvucontrol",
+      "nixpkgs_homepage": "https://github.com/saivert/pwvucontrol",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "python310",
+      "nixpkgs_attribute": "python310",
+      "aur_rank": 444,
+      "source_homepage": "https://www.python.org/",
+      "nixpkgs_homepage": "https://www.python.org",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "python312",
+      "nixpkgs_attribute": "python312",
+      "aur_rank": 206,
+      "source_homepage": "https://www.python.org/",
+      "nixpkgs_homepage": "https://www.python.org",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "qdirstat",
+      "nixpkgs_attribute": "qdirstat",
+      "aur_rank": 317,
+      "source_homepage": "https://github.com/shundhammer/qdirstat",
+      "nixpkgs_homepage": "https://github.com/shundhammer/qdirstat",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "qview",
+      "nixpkgs_attribute": "qview",
+      "aur_rank": 641,
+      "source_homepage": "https://interversehq.com/qview/",
+      "nixpkgs_homepage": "https://interversehq.com/qview/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "rasdaemon",
+      "nixpkgs_attribute": "rasdaemon",
+      "aur_rank": 366,
+      "source_homepage": "https://github.com/mchehab/rasdaemon",
+      "nixpkgs_homepage": "https://github.com/mchehab/rasdaemon",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "rclone-browser",
+      "nixpkgs_attribute": "rclone-browser",
+      "aur_rank": 835,
+      "source_homepage": "https://github.com/kapitainsky/RcloneBrowser",
+      "nixpkgs_homepage": "https://github.com/kapitainsky/RcloneBrowser",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "rmlint",
+      "nixpkgs_attribute": "rmlint",
+      "aur_rank": 230,
+      "source_homepage": "https://github.com/sahib/rmlint",
+      "nixpkgs_homepage": "https://rmlint.readthedocs.org",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "rustdesk",
+      "nixpkgs_attribute": "rustdesk",
+      "aur_rank": 143,
+      "source_homepage": "https://rustdesk.com/",
+      "nixpkgs_homepage": "https://rustdesk.com",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ryzenadj",
+      "nixpkgs_attribute": "ryzenadj",
+      "aur_rank": 583,
+      "source_homepage": "https://github.com/FlyGoat/RyzenAdj",
+      "nixpkgs_homepage": "https://github.com/FlyGoat/RyzenAdj",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "sc-im",
+      "nixpkgs_attribute": "sc-im",
+      "aur_rank": 731,
+      "source_homepage": "https://github.com/andmarti1424/sc-im",
+      "nixpkgs_homepage": "https://github.com/andmarti1424/sc-im",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "shntool",
+      "nixpkgs_attribute": "shntool",
+      "aur_rank": 860,
+      "source_homepage": "http://shnutils.freeshell.org/shntool/",
+      "nixpkgs_homepage": "http://www.etree.org/shnutils/shntool/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "smem",
+      "nixpkgs_attribute": "smem",
+      "aur_rank": 424,
+      "source_homepage": "https://www.selenic.com/smem/",
+      "nixpkgs_homepage": "https://www.selenic.com/smem/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "spicetify-cli",
+      "nixpkgs_attribute": "spicetify-cli",
+      "aur_rank": 204,
+      "source_homepage": "https://github.com/spicetify/cli",
+      "nixpkgs_homepage": "https://github.com/spicetify/cli",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "splix",
+      "nixpkgs_attribute": "splix",
+      "aur_rank": 188,
+      "source_homepage": "https://openprinting.github.io/splix/",
+      "nixpkgs_homepage": "http://splix.ap2c.org",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "spotify",
+      "nixpkgs_attribute": "spotify",
+      "aur_rank": 103,
+      "source_homepage": "https://www.spotify.com",
+      "nixpkgs_homepage": "https://www.spotify.com/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "subtitleedit",
+      "nixpkgs_attribute": "subtitleedit",
+      "aur_rank": 166,
+      "source_homepage": "https://www.nikse.dk/subtitleedit",
+      "nixpkgs_homepage": "https://nikse.dk/subtitleedit",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "sunshine",
+      "nixpkgs_attribute": "sunshine",
+      "aur_rank": 434,
+      "source_homepage": "https://app.lizardbyte.dev/Sunshine",
+      "nixpkgs_homepage": "https://github.com/LizardByte/Sunshine",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "swayfx",
+      "nixpkgs_attribute": "swayfx",
+      "aur_rank": 151,
+      "source_homepage": "https://github.com/WillPower3309/swayfx",
+      "nixpkgs_homepage": "https://github.com/WillPower3309/swayfx",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "teams-for-linux",
+      "nixpkgs_attribute": "teams-for-linux",
+      "aur_rank": 482,
+      "source_homepage": "https://github.com/IsmaelMartinez/teams-for-linux",
+      "nixpkgs_homepage": "https://github.com/IsmaelMartinez/teams-for-linux",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "teamviewer",
+      "nixpkgs_attribute": "teamviewer",
+      "aur_rank": 596,
+      "source_homepage": "https://www.teamviewer.com/en/download/portal/linux/",
+      "nixpkgs_homepage": "https://www.teamviewer.com",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "thinkfan",
+      "nixpkgs_attribute": "thinkfan",
+      "aur_rank": 443,
+      "source_homepage": "https://github.com/vmatare/thinkfan",
+      "nixpkgs_homepage": "https://github.com/vmatare/thinkfan",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "tio",
+      "nixpkgs_attribute": "tio",
+      "aur_rank": 819,
+      "source_homepage": "https://tio.github.io/",
+      "nixpkgs_homepage": "https://tio.github.io/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "tofi",
+      "nixpkgs_attribute": "tofi",
+      "aur_rank": 603,
+      "source_homepage": "https://github.com/philj56/tofi",
+      "nixpkgs_homepage": "https://github.com/philj56/tofi",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "topgrade",
+      "nixpkgs_attribute": "topgrade",
+      "aur_rank": 226,
+      "source_homepage": "https://topgrade-rs.github.io",
+      "nixpkgs_homepage": "https://github.com/topgrade-rs/topgrade",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "units",
+      "nixpkgs_attribute": "units",
+      "aur_rank": 256,
+      "source_homepage": "https://www.gnu.org/software/units/units.html",
+      "nixpkgs_homepage": "https://www.gnu.org/software/units/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "uptime-kuma",
+      "nixpkgs_attribute": "uptime-kuma",
+      "aur_rank": 427,
+      "source_homepage": "https://github.com/louislam/uptime-kuma",
+      "nixpkgs_homepage": "https://github.com/louislam/uptime-kuma",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ventoy-bin",
+      "nixpkgs_attribute": "ventoy-bin",
+      "aur_rank": 47,
+      "source_homepage": "http://www.ventoy.net",
+      "nixpkgs_homepage": "https://www.ventoy.net",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "vesktop",
+      "nixpkgs_attribute": "vesktop",
+      "aur_rank": 391,
+      "source_homepage": "https://github.com/Vencord/Vesktop",
+      "nixpkgs_homepage": "https://github.com/Vencord/Vesktop",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "vikunja",
+      "nixpkgs_attribute": "vikunja",
+      "aur_rank": 843,
+      "source_homepage": "https://vikunja.io/",
+      "nixpkgs_homepage": "https://vikunja.io/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "vintagestory",
+      "nixpkgs_attribute": "vintagestory",
+      "aur_rank": 441,
+      "source_homepage": "https://www.vintagestory.at/",
+      "nixpkgs_homepage": "https://www.vintagestory.at/",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "vkbasalt",
+      "nixpkgs_attribute": "vkbasalt",
+      "aur_rank": 241,
+      "source_homepage": "https://github.com/DadSchoorse/vkBasalt",
+      "nixpkgs_homepage": "https://github.com/DadSchoorse/vkBasalt",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "vmware-workstation",
+      "nixpkgs_attribute": "vmware-workstation",
+      "aur_rank": 575,
+      "source_homepage": "https://www.vmware.com/products/workstation-for-linux.html",
+      "nixpkgs_homepage": "https://www.vmware.com/products/workstation-pro.html",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "vscodium",
+      "nixpkgs_attribute": "vscodium",
+      "aur_rank": 161,
+      "source_homepage": "https://github.com/VSCodium/vscodium.git",
+      "nixpkgs_homepage": "https://github.com/VSCodium/vscodium",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "walker",
+      "nixpkgs_attribute": "walker",
+      "aur_rank": 691,
+      "source_homepage": "https://github.com/abenz1267/walker",
+      "nixpkgs_homepage": "https://github.com/abenz1267/walker",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "whatsie",
+      "nixpkgs_attribute": "whatsie",
+      "aur_rank": 279,
+      "source_homepage": "https://github.com/keshavbhatt/whatsie",
+      "nixpkgs_homepage": "https://github.com/keshavbhatt/whatsie",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "winbox",
+      "nixpkgs_attribute": "winbox",
+      "aur_rank": 128,
+      "source_homepage": "https://mikrotik.com/download",
+      "nixpkgs_homepage": "https://mikrotik.com",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "xautolock",
+      "nixpkgs_attribute": "xautolock",
+      "aur_rank": 692,
+      "source_homepage": "https://ibiblio.org/pub/Linux/X11/screensavers/",
+      "nixpkgs_homepage": "http://www.ibiblio.org/pub/linux/X11/screensavers",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "xboxdrv",
+      "nixpkgs_attribute": "xboxdrv",
+      "aur_rank": 805,
+      "source_homepage": "https://github.com/xiota/xboxdrv",
+      "nixpkgs_homepage": "https://xboxdrv.gitlab.io/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "xclicker",
+      "nixpkgs_attribute": "xclicker",
+      "aur_rank": 462,
+      "source_homepage": "https://github.com/robiot/xclicker",
+      "nixpkgs_homepage": "https://xclicker.xyz/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "xsane",
+      "nixpkgs_attribute": "xsane",
+      "aur_rank": 428,
+      "source_homepage": "https://gitlab.com/sane-project/frontend/xsane",
+      "nixpkgs_homepage": "http://www.sane-project.org/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "xsd",
+      "nixpkgs_attribute": "xsd",
+      "aur_rank": 738,
+      "source_homepage": "https://www.codesynthesis.com/products/xsd",
+      "nixpkgs_homepage": "http://www.codesynthesis.com/products/xsd",
+      "evidence": "same_name_and_upstream_homepage"
+    },
+    {
+      "source_package": "ytmdesktop",
+      "nixpkgs_attribute": "ytmdesktop",
+      "aur_rank": 333,
+      "source_homepage": "https://ytmdesktop.github.io",
+      "nixpkgs_homepage": "https://ytmdesktop.app/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "zapzap",
+      "nixpkgs_attribute": "zapzap",
+      "aur_rank": 163,
+      "source_homepage": "https://github.com/rafatosta/zapzap",
+      "nixpkgs_homepage": "https://zapzap-linux.github.io/",
+      "evidence": "same_name_only"
+    },
+    {
+      "source_package": "zoom",
+      "nixpkgs_attribute": "zoom",
+      "aur_rank": 90,
+      "source_homepage": "https://zoom.us/",
+      "nixpkgs_homepage": "https://www.logicalshift.co.uk/unix/zoom/",
+      "evidence": "same_name_only"
+    }
+  ]
+}

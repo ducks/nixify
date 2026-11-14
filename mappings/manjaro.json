@@ -1,0 +1,601 @@
+{
+  "schema_version": 1,
+  "distribution": "manjaro",
+  "entries": [
+    {
+      "source_package": "acpi",
+      "kind": "package",
+      "nixpkgs_attribute": "acpi",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://sourceforge.net/projects/acpiclient/files/acpiclient/",
+        "nixpkgs_homepage": "https://sourceforge.net/projects/acpiclient/"
+      }
+    },
+    {
+      "source_package": "alacritty",
+      "kind": "package",
+      "nixpkgs_attribute": "alacritty",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "base-devel",
+      "kind": "manual_review",
+      "nixpkgs_attribute": null,
+      "note": "Package group has no single equivalent; choose development tools manually.",
+      "verification": null
+    },
+    {
+      "source_package": "bat",
+      "kind": "package",
+      "nixpkgs_attribute": "bat",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "bison",
+      "kind": "package",
+      "nixpkgs_attribute": "bison",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://www.gnu.org/software/bison/bison.html",
+        "nixpkgs_homepage": "https://www.gnu.org/software/bison/"
+      }
+    },
+    {
+      "source_package": "btop",
+      "kind": "package",
+      "nixpkgs_attribute": "btop",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "btrfs-progs",
+      "kind": "package",
+      "nixpkgs_attribute": "btrfs-progs",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://btrfs.readthedocs.io",
+        "nixpkgs_homepage": "https://btrfs.readthedocs.io/en/latest/"
+      }
+    },
+    {
+      "source_package": "chromium",
+      "kind": "package",
+      "nixpkgs_attribute": "chromium",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://www.chromium.org/Home",
+        "nixpkgs_homepage": "https://www.chromium.org/"
+      }
+    },
+    {
+      "source_package": "curl",
+      "kind": "package",
+      "nixpkgs_attribute": "curl",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "diffutils",
+      "kind": "package",
+      "nixpkgs_attribute": "diffutils",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://www.gnu.org/software/diffutils",
+        "nixpkgs_homepage": "https://www.gnu.org/software/diffutils/diffutils.html"
+      }
+    },
+    {
+      "source_package": "f2fs-tools",
+      "kind": "package",
+      "nixpkgs_attribute": "f2fs-tools",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://git.kernel.org/pub/scm/linux/kernel/git/jaegeuk/f2fs-tools.git/about/",
+        "nixpkgs_homepage": "https://git.kernel.org/pub/scm/linux/kernel/git/jaegeuk/f2fs-tools.git/"
+      }
+    },
+    {
+      "source_package": "fd",
+      "kind": "package",
+      "nixpkgs_attribute": "fd",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "ffmpeg",
+      "kind": "package",
+      "nixpkgs_attribute": "ffmpeg",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "firefox",
+      "kind": "package",
+      "nixpkgs_attribute": "firefox",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "fish",
+      "kind": "package",
+      "nixpkgs_attribute": "fish",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "fzf",
+      "kind": "package",
+      "nixpkgs_attribute": "fzf",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "gcc",
+      "kind": "package",
+      "nixpkgs_attribute": "gcc",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "git",
+      "kind": "package",
+      "nixpkgs_attribute": "git",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "github-cli",
+      "kind": "package",
+      "nixpkgs_attribute": "github-cli",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://github.com/cli/cli",
+        "nixpkgs_homepage": "https://cli.github.com/"
+      }
+    },
+    {
+      "source_package": "gnome-terminal",
+      "kind": "package",
+      "nixpkgs_attribute": "gnome-terminal",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://wiki.gnome.org/Apps/Terminal",
+        "nixpkgs_homepage": "https://gitlab.gnome.org/GNOME/gnome-terminal"
+      }
+    },
+    {
+      "source_package": "htop",
+      "kind": "package",
+      "nixpkgs_attribute": "htop",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "iproute2",
+      "kind": "package",
+      "nixpkgs_attribute": "iproute2",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://git.kernel.org/pub/scm/network/iproute2/iproute2.git",
+        "nixpkgs_homepage": "https://wiki.linuxfoundation.org/networking/iproute2"
+      }
+    },
+    {
+      "source_package": "jq",
+      "kind": "package",
+      "nixpkgs_attribute": "jq",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "kitty",
+      "kind": "package",
+      "nixpkgs_attribute": "kitty",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "less",
+      "kind": "package",
+      "nixpkgs_attribute": "less",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "make",
+      "kind": "package",
+      "nixpkgs_attribute": "gnumake",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "man-db",
+      "kind": "package",
+      "nixpkgs_attribute": "man-db",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://gitlab.com/man-db/man-db",
+        "nixpkgs_homepage": "http://man-db.nongnu.org"
+      }
+    },
+    {
+      "source_package": "mdadm",
+      "kind": "package",
+      "nixpkgs_attribute": "mdadm",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://git.kernel.org/pub/scm/utils/mdadm",
+        "nixpkgs_homepage": "https://git.kernel.org/pub/scm/utils/mdadm/mdadm.git"
+      }
+    },
+    {
+      "source_package": "nano",
+      "kind": "package",
+      "nixpkgs_attribute": "nano",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "neovim",
+      "kind": "package",
+      "nixpkgs_attribute": "neovim",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "nmap",
+      "kind": "package",
+      "nixpkgs_attribute": "nmap",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "noto-fonts",
+      "kind": "package",
+      "nixpkgs_attribute": "noto-fonts",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://fonts.google.com/noto",
+        "nixpkgs_homepage": "https://www.google.com/get/noto/"
+      }
+    },
+    {
+      "source_package": "openssh",
+      "kind": "package",
+      "nixpkgs_attribute": "openssh",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "patch",
+      "kind": "package",
+      "nixpkgs_attribute": "patch",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://www.gnu.org/software/patch/",
+        "nixpkgs_homepage": "https://savannah.gnu.org/projects/patch"
+      }
+    },
+    {
+      "source_package": "ripgrep",
+      "kind": "package",
+      "nixpkgs_attribute": "ripgrep",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "rofi",
+      "kind": "package",
+      "nixpkgs_attribute": "rofi",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://davatorium.github.io/rofi",
+        "nixpkgs_homepage": "https://github.com/davatorium/rofi"
+      }
+    },
+    {
+      "source_package": "rsync",
+      "kind": "package",
+      "nixpkgs_attribute": "rsync",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "ruby",
+      "kind": "package",
+      "nixpkgs_attribute": "ruby",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://www.ruby-lang.org/en/",
+        "nixpkgs_homepage": "https://www.ruby-lang.org/"
+      }
+    },
+    {
+      "source_package": "shellcheck",
+      "kind": "package",
+      "nixpkgs_attribute": "shellcheck",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "tmux",
+      "kind": "package",
+      "nixpkgs_attribute": "tmux",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "tree",
+      "kind": "package",
+      "nixpkgs_attribute": "tree",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "unrar",
+      "kind": "package",
+      "nixpkgs_attribute": "unrar",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://www.rarlab.com/rar_add.htm",
+        "nixpkgs_homepage": "https://www.rarlab.com/"
+      }
+    },
+    {
+      "source_package": "unzip",
+      "kind": "package",
+      "nixpkgs_attribute": "unzip",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "usbutils",
+      "kind": "package",
+      "nixpkgs_attribute": "usbutils",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usbutils.git/",
+        "nixpkgs_homepage": "http://www.linux-usb.org/"
+      }
+    },
+    {
+      "source_package": "vlc",
+      "kind": "package",
+      "nixpkgs_attribute": "vlc",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "wget",
+      "kind": "package",
+      "nixpkgs_attribute": "wget",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "which",
+      "kind": "package",
+      "nixpkgs_attribute": "which",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "xclip",
+      "kind": "package",
+      "nixpkgs_attribute": "xclip",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    },
+    {
+      "source_package": "xdg-utils",
+      "kind": "package",
+      "nixpkgs_attribute": "xdg-utils",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://gitlab.freedesktop.org/xdg/xdg-utils",
+        "nixpkgs_homepage": "https://www.freedesktop.org/wiki/Software/xdg-utils/"
+      }
+    },
+    {
+      "source_package": "zola",
+      "kind": "package",
+      "nixpkgs_attribute": "zola",
+      "note": "Descriptions and upstream references compared; package-level mapping only. Verify target revision, platform and configuration.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Repository and Nixpkgs descriptions and homepage references were compared manually. Checkout revision is self-reported; the check does not establish identical behavior, buildability or availability on another revision.",
+        "source_homepage": "https://github.com/getzola/zola",
+        "nixpkgs_homepage": "https://www.getzola.org/"
+      }
+    },
+    {
+      "source_package": "zsh",
+      "kind": "package",
+      "nixpkgs_attribute": "zsh",
+      "note": "Package-level mapping only; verify target revision, configuration and behavior.",
+      "verification": {
+        "nixpkgs_revision": "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a",
+        "method": "local_attribute_is_derivation",
+        "limitations": "Checkout revision is self-reported; existence does not establish source-package equivalence, configuration, buildability or availability on another revision."
+      }
+    }
+  ]
+}
