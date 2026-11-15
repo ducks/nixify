@@ -259,6 +259,28 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         out.push_str("Network manager service state is unknown.\n");
     }
     out.push_str("Hostname, interface configuration, DNS addresses, VPNs and effective firewall rules require manual review.\n");
+    out.push_str("\n## Configuration locations\n\n");
+    if let Some(entries) = &inventory.config_evidence {
+        out.push_str("Only known locations for installed packages were checked. File contents were not read or copied; a present file may contain defaults, and a missing file does not establish that no configuration exists. User locations refer to the scanning account.\n\n");
+        for entry in entries {
+            let state = match entry.state {
+                crate::config_evidence::ConfigState::Present => {
+                    "file present; inspect and migrate manually"
+                }
+                crate::config_evidence::ConfigState::Missing => "not found at this location",
+                crate::config_evidence::ConfigState::SymlinkNotFollowed => {
+                    "symlink encountered; inspect manually"
+                }
+                crate::config_evidence::ConfigState::OtherType => {
+                    "unexpected file type; inspect manually"
+                }
+                crate::config_evidence::ConfigState::Unavailable => "unavailable; state unknown",
+            };
+            let _ = writeln!(out, "- `{}`: {}.", entry.id.label(), state);
+        }
+    } else {
+        out.push_str("Configuration locations were not scanned in this inventory.\n");
+    }
     out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop hints do not establish your configured default; verify hardware, networking, filesystems, and boot configuration separately.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Inferred matches include some foreign packages; foreign status does not establish AUR provenance. Review inferred packages together in packages.nix and this report.\n");
     out
 }

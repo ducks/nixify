@@ -986,3 +986,73 @@ fn cli_desktop_choice_is_explicit_and_preserves_other_hints() {
     assert!(report.contains("Explicit desktop selection: Hyprland"));
     assert!(report.contains("Lemurs"));
 }
+
+#[test]
+fn configuration_discovery_is_fixed_location_and_never_reads_contents() {
+    use nixify::{
+        config_evidence::{self, ConfigId, ConfigState},
+        inventory::Package,
+    };
+    use std::os::unix::fs::symlink;
+    let mut inv = fixture();
+    for name in ["hyprland", "waybar", "lemurs"] {
+        inv.packages.push(Package {
+            name: name.into(),
+            version: "1".into(),
+            explicitly_installed: true,
+            foreign: false,
+            evidence: vec![],
+        });
+    }
+    let root = tempfile::tempdir().unwrap();
+    let sys = root.path().join("sysroot");
+    let home = root.path().join("home");
+    fs::create_dir_all(sys.join("etc/lemurs")).unwrap();
+    fs::create_dir_all(home.join(".config/hypr")).unwrap();
+    fs::write(
+        sys.join("etc/lemurs/config.toml"),
+        "password=secret-test-value",
+    )
+    .unwrap();
+    fs::write(
+        home.join(".config/hypr/hyprland.conf"),
+        "token=secret-test-value",
+    )
+    .unwrap();
+    symlink(home.join(".config/hypr"), home.join(".config/waybar")).unwrap();
+    let entries = config_evidence::scan_at(&inv, &sys, Some(&home));
+    let state = |id| entries.iter().find(|e| e.id == id).unwrap().state;
+    assert_eq!(state(ConfigId::Lemurs), ConfigState::Present);
+    assert_eq!(state(ConfigId::Hyprland), ConfigState::Present);
+    assert_eq!(state(ConfigId::Waybar), ConfigState::SymlinkNotFollowed);
+    assert!(!serde_json::to_string(&entries)
+        .unwrap()
+        .contains("secret-test-value"));
+    assert!(!serde_json::to_string(&entries)
+        .unwrap()
+        .contains(root.path().to_str().unwrap()));
+    inv.config_evidence = Some(entries);
+    inv.validate().unwrap();
+    let report = output::report(&inv, &mapping::decisions(&inv));
+    assert!(report.contains("$HOME/.config/hypr/hyprland.conf"));
+    assert!(report.contains("symlink encountered"));
+    assert!(!report.contains("secret-test-value"));
+    let empty_home = config_evidence::scan_at(&inv, &sys, None);
+    assert_eq!(
+        empty_home
+            .iter()
+            .find(|e| e.id == ConfigId::Hyprland)
+            .unwrap()
+            .state,
+        ConfigState::Unavailable
+    );
+}
+
+#[test]
+fn old_inventory_without_config_evidence_remains_valid() {
+    let mut value = serde_json::to_value(fixture()).unwrap();
+    value.as_object_mut().unwrap().remove("config_evidence");
+    let inventory: Inventory = serde_json::from_value(value).unwrap();
+    assert!(inventory.config_evidence.is_none());
+    inventory.validate().unwrap();
+}

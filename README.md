@@ -47,6 +47,10 @@ unknown, not BIOS; loop devices are omitted. No partition, filesystem or boot
 configuration is generated. USB devices, fstab, Wi-Fi settings and detailed hardware
 configuration are not scanned yet. Review the inventory before sharing it. Network inventory records interface-type counts, resolver categories and installed firewall package names; it does not retain interface names, addresses, DNS search domains, hostname or credentials. These summaries can still reveal aspects of your network or security posture.
 
+## Configuration locations
+
+The report identifies selected configuration locations for installed packages, including SSH, Docker, Lemurs, Hyprland, Waybar, Kitty, Neovim and Zsh. It checks metadata only and does not copy or interpret file contents. User locations refer to the scanning account’s `$HOME`; alternate locations and other users are not scanned. A symlink is reported without following it, and a missing file does not prove that the application has no configuration. Existing inventories without this field remain usable.
+
 ## Review more package mappings
 
 Curated Manjaro mappings live in [mappings/manjaro.json](mappings/manjaro.json). An optional helper can collect public AUR and Arch package metadata for mapping review; see [package sources and contributions](docs/package-sources.md). This lookup is explicitly online and sends selected package names to the chosen registry.
@@ -86,7 +90,7 @@ For a channel-based installation, the local path may be `/nix/var/nix/profiles/p
 
 ## Privacy
 
-Inventories disclose installed package names, versions, origin flags, architecture and distribution. Treat them as sensitive. The scanner does not read private keys, credentials, home directories, Wi-Fi settings, arbitrary environment variables or service configuration. It reads only `XDG_CURRENT_DESKTOP` and `XDG_SESSION_TYPE` as optional session hints, retaining recognized values only; it checks known session-file paths without reading their contents. Hardware inventory includes CPU model, PCI display/network vendor and model, block-device types, sizes and filesystem types; these can identify your machine. It excludes device names, serials, UUIDs and non-system mount paths. Inventory and draft files are created with owner-only permissions on Unix. Review before sharing. A requested Nixpkgs baseline runs `nix-instantiate` on the specified checkout, so only evaluate a source you trust.
+Inventories disclose installed package names, versions, origin flags, architecture and distribution. Treat them as sensitive. The scanner checks a small fixed set of system and scanning-user configuration paths for file presence; it does not read their contents, follow discovered symlinks, or retain the home directory path. It does not read private keys, credentials, Wi-Fi settings, or arbitrary environment variables. It reads only `XDG_CURRENT_DESKTOP` and `XDG_SESSION_TYPE` as optional session hints, retaining recognized values only; it checks known session-file paths without reading their contents. Hardware inventory includes CPU model, PCI display/network vendor and model, block-device types, sizes and filesystem types; these can identify your machine. It excludes device names, serials, UUIDs and non-system mount paths. Inventory and draft files are created with owner-only permissions on Unix. Review before sharing. A requested Nixpkgs baseline runs `nix-instantiate` on the specified checkout, so only evaluate a source you trust.
 
 ## Development
 

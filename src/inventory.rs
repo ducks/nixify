@@ -14,6 +14,8 @@ pub struct Inventory {
     pub hardware: Option<crate::hardware::Hardware>,
     #[serde(default)]
     pub networking: Option<crate::network::NetworkInventory>,
+    #[serde(default)]
+    pub config_evidence: Option<Vec<crate::config_evidence::ConfigEvidence>>,
     pub warnings: Vec<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -190,6 +192,12 @@ impl Inventory {
                 !["firewalld", "ufw", "nftables", "iptables", "iptables-nft"].contains(&p.as_str())
             }) {
                 return Err("invalid firewall package evidence".into());
+            }
+        }
+        if let Some(entries) = &self.config_evidence {
+            let mut ids = std::collections::BTreeSet::new();
+            if entries.iter().any(|entry| !ids.insert(entry.id)) {
+                return Err("duplicate configuration evidence".into());
             }
         }
         Ok(())
