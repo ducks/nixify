@@ -1,5 +1,6 @@
 pub mod baseline;
 pub mod config_evidence;
+pub mod config_inspection;
 pub mod desktop;
 pub mod draft;
 pub mod hardware;

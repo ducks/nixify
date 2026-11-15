@@ -7,3 +7,5 @@
 - Baseline overlap is exact `pname` comparison against a minimal NixOS configuration evaluated from the specified checkout. It is not behavioral equivalence or a full source-to-target package mapping, and does not suppress generated packages. The target might use different modules or a different Nixpkgs revision.
 - Queries are separate snapshots; database inconsistencies are detected where possible, but changes that preserve set membership can go unnoticed. The process times out after 30 seconds and limits captured output to 4 MiB per stream.
 - Nix package builds and live baseline evaluation may require access to the Nix daemon or other local Nix resources. This environment cannot access the daemon socket; `nix build` and `nix flake check` remain unverified here.
+
+- Opt-in file-content inspection covers only two Hyprland settings and Docker live-restore. It omits unrecognized values, does not follow final symlinks or resolve includes, and does not migrate application data or user configuration files.

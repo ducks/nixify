@@ -51,6 +51,35 @@ configuration are not scanned yet. Review the inventory before sharing it. Netwo
 
 The report identifies selected configuration locations for installed packages, including SSH, Docker, Lemurs, Hyprland, Waybar, Kitty, Neovim and Zsh. It checks metadata only and does not copy or interpret file contents. User locations refer to the scanning account’s `$HOME`; alternate locations and other users are not scanned. A symlink is reported without following it, and a missing file does not prove that the application has no configuration. Existing inventories without this field remain usable.
 
+## Optional configuration inspection
+
+File-content inspection is opt-in. Choose a profile and a specific regular file;
+`inspect-config` never modifies the source, rejects final symlinks and files over
+256 KiB, and creates a new owner-only JSON file. No raw file paths or contents are
+stored. The profile determines which typed settings can be retained; all other
+items are counted but omitted. The initial profiles are `hyprland` and
+`docker-daemon`.
+
+```sh
+nixify inspect-config --profile hyprland --file ~/.config/hypr/hyprland.conf --output hypr-inspection.json
+nixify generate --input inventory.json --output ./nixos-migration --desktop hyprland --config-inspection hypr-inspection.json
+```
+
+The Hyprland profile recognizes only `general.layout` (`dwindle` or `master`)
+and `input.natural_scroll` booleans. It reports these for review; it does not
+write user configuration or migrate keybindings, environment entries, commands,
+includes or other settings. Includes and ambiguous blocks make the findings
+incomplete and suppress values because they might be overridden.
+
+The Docker profile recognizes only the JSON boolean `live-restore`, rejects
+duplicate keys, and omits other settings. When an inspection is supplied to
+`generate`, nixify writes the corresponding Docker option only if the inventory
+shows the system Docker service persistently enabled. This does not migrate
+Docker data or other daemon settings. Inspect and review the original files and
+output; a successful inspection is not configuration equivalence. Add profiles
+and typed translation rules for additional formats rather than accepting
+arbitrary source keys as Nix expressions.
+
 ## Review more package mappings
 
 Curated Manjaro mappings live in [mappings/manjaro.json](mappings/manjaro.json). An optional helper can collect public AUR and Arch package metadata for mapping review; see [package sources and contributions](docs/package-sources.md). This lookup is explicitly online and sends selected package names to the chosen registry.

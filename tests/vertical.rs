@@ -1056,3 +1056,165 @@ fn old_inventory_without_config_evidence_remains_valid() {
     assert!(inventory.config_evidence.is_none());
     inventory.validate().unwrap();
 }
+
+#[test]
+fn config_profiles_retain_only_allowlisted_typed_settings() {
+    use nixify::config_inspection::{self as config, Profile, Setting};
+    let source = "general {\n layout = dwindle\n}\ninput {\n natural_scroll = true\n touchpad {\n disable_while_typing = true\n }\n}\nenv = TOKEN,do-not-save\nexec-once = private-command\n";
+    let hypr = config::inspect(Profile::Hyprland, source).unwrap();
+    assert!(matches!(
+        hypr.settings.as_slice(),
+        [
+            Setting::HyprlandLayout(_),
+            Setting::HyprlandNaturalScroll(true)
+        ]
+    ));
+    assert_eq!(hypr.unhandled_items, 3);
+    let encoded = serde_json::to_string(&hypr).unwrap();
+    assert!(!encoded.contains("do-not-save") && !encoded.contains("private-command"));
+    let overridden = config::inspect(
+        Profile::Hyprland,
+        "source = private.conf\ngeneral {\nlayout = master\n}\n",
+    )
+    .unwrap();
+    assert!(overridden.incomplete && overridden.settings.is_empty());
+    let duplicate = config::inspect(
+        Profile::Hyprland,
+        "input {\nnatural_scroll = true\nnatural_scroll = false\n}\n",
+    )
+    .unwrap();
+    assert!(duplicate.incomplete && duplicate.settings.is_empty());
+    let docker = config::inspect(
+        Profile::DockerDaemon,
+        r#"{"live-restore":true,"auths":{"secret":"hidden"}}"#,
+    )
+    .unwrap();
+    assert!(matches!(
+        docker.settings.as_slice(),
+        [Setting::DockerLiveRestore(true)]
+    ));
+    assert_eq!(docker.unhandled_items, 1);
+    assert!(!serde_json::to_string(&docker).unwrap().contains("hidden"));
+    assert!(config::inspect(
+        Profile::DockerDaemon,
+        r#"{"live-restore":true,"live-restore":false}"#
+    )
+    .is_err());
+    assert!(config::inspect(Profile::DockerDaemon, r#"{"live-restore":"true"}"#).is_err());
+}
+
+#[test]
+fn inspected_docker_setting_requires_explicit_file_and_enabled_service() {
+    use nixify::{
+        config_inspection::{self as config, Profile},
+        inventory::Scope,
+        systemd,
+    };
+    let mut inv = fixture();
+    let inspection = config::inspect(
+        Profile::DockerDaemon,
+        r#"{"live-restore":true,"registry-token":"dont-copy"}"#,
+    )
+    .unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let review = mapping::ReviewedMappings::empty();
+    let revision = nixify::draft::default_revision().unwrap();
+    let disabled = root.path().join("disabled");
+    output::generate_with_inspections(
+        &inv,
+        &disabled,
+        &revision,
+        &review,
+        None,
+        std::slice::from_ref(&inspection),
+    )
+    .unwrap();
+    assert!(!fs::read_to_string(disabled.join("services.nix"))
+        .unwrap()
+        .contains("live-restore"));
+    inv.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("docker.service enabled enabled\n"),
+        None,
+    )];
+    let enabled = root.path().join("enabled");
+    output::generate_with_inspections(&inv, &enabled, &revision, &review, None, &[inspection])
+        .unwrap();
+    let module = fs::read_to_string(enabled.join("services.nix")).unwrap();
+    assert!(module.contains("virtualisation.docker.daemon.settings.\"live-restore\" = true;"));
+    assert!(!module.contains("dont-copy"));
+    assert!(
+        !fs::read_to_string(enabled.join("configuration-inspections.json"))
+            .unwrap()
+            .contains("dont-copy")
+    );
+}
+
+#[test]
+fn explicit_config_read_rejects_symlinks_and_oversized_files() {
+    use std::os::unix::fs::symlink;
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("file");
+    fs::write(&file, vec![b'x'; 256 * 1024 + 1]).unwrap();
+    assert!(nixify::config_inspection::read_explicit(&file).is_err());
+    let link = dir.path().join("link");
+    symlink(&file, &link).unwrap();
+    assert!(nixify::config_inspection::read_explicit(&link).is_err());
+}
+
+#[test]
+fn cli_inspects_config_and_generates_draft_without_raw_values() {
+    use nixify::{inventory::Scope, systemd};
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("daemon.json");
+    let inspection = temp.path().join("inspection.json");
+    fs::write(
+        &source,
+        r#"{"live-restore":false,"secret":"do-not-export"}"#,
+    )
+    .unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["inspect-config", "--profile", "docker-daemon", "--file"])
+        .arg(&source)
+        .args(["--output"])
+        .arg(&inspection)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(!fs::read_to_string(&inspection)
+        .unwrap()
+        .contains("do-not-export"));
+    let mut inv = fixture();
+    inv.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("docker.service enabled enabled\n"),
+        None,
+    )];
+    let inventory = temp.path().join("inventory.json");
+    fs::write(&inventory, serde_json::to_vec(&inv).unwrap()).unwrap();
+    let dir = temp.path().join("draft");
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["generate", "--input"])
+        .arg(&inventory)
+        .args(["--output"])
+        .arg(&dir)
+        .args(["--config-inspection"])
+        .arg(&inspection)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(fs::read_to_string(dir.join("services.nix"))
+        .unwrap()
+        .contains("daemon.settings.\"live-restore\" = false;"));
+    assert!(!fs::read_to_string(dir.join("migration-report.md"))
+        .unwrap()
+        .contains("do-not-export"));
+}

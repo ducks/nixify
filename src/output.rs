@@ -326,7 +326,27 @@ pub fn generate_with_desktop(
     review: &mapping::ReviewedMappings,
     selected: Option<desktop::DesktopKind>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_inspections(inventory, dir, revision, review, selected, &[])
+}
+
+pub fn generate_with_inspections(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+    selected: Option<desktop::DesktopKind>,
+    inspections: &[crate::config_inspection::Inspection],
+) -> Result<(), Box<dyn std::error::Error>> {
     inventory.validate().map_err(io::Error::other)?;
+    for (index, inspection) in inspections.iter().enumerate() {
+        inspection.validate().map_err(io::Error::other)?;
+        if inspections[..index]
+            .iter()
+            .any(|other| other.profile == inspection.profile)
+        {
+            return Err(io::Error::other("duplicate configuration inspection profile").into());
+        }
+    }
     if selected.is_some_and(|kind| desktop::suggested_option(kind).is_none()) {
         return Err(io::Error::other("unsupported desktop selection").into());
     }
@@ -347,10 +367,22 @@ pub fn generate_with_desktop(
         &dir.join("package-decisions.json"),
         &(serde_json::to_string_pretty(&decisions)? + "\n"),
     )?;
-    create_file(
-        &dir.join("services.nix"),
-        &services_nix(&service_mapping::decisions(inventory)),
-    )?;
+    let service_decisions = service_mapping::decisions(inventory);
+    let mut services = services_nix(&service_decisions);
+    let docker_enabled = service_decisions
+        .iter()
+        .any(|d| d.nixos_option == Some("virtualisation.docker.enable"));
+    if docker_enabled {
+        for inspection in inspections {
+            for setting in &inspection.settings {
+                if let crate::config_inspection::Setting::DockerLiveRestore(value) = setting {
+                    let setting = format!("  virtualisation.docker.daemon.settings.\"live-restore\" = {value}; # inspected\n");
+                    services.insert_str(services.len() - 2, &setting);
+                }
+            }
+        }
+    }
+    create_file(&dir.join("services.nix"), &services)?;
     create_file(
         &dir.join("desktop.nix"),
         &desktop_nix_with_selection(inventory, selected),
@@ -365,9 +397,34 @@ pub fn generate_with_desktop(
             &(serde_json::to_string_pretty(&review)? + "\n"),
         )?;
     }
+    let mut inspection_report = String::new();
+    if !inspections.is_empty() {
+        inspection_report.push_str("\n## Explicit configuration inspections\n\nOnly allowlisted settings are retained. Other content was omitted; inspect the original files before migration. Hyprland findings are review-only and not applied.\n\n");
+        for inspection in inspections {
+            let _ = writeln!(
+                inspection_report,
+                "- {:?}: {} omitted directives/settings; incomplete: {}; retained: {:?}.",
+                inspection.profile,
+                inspection.unhandled_items,
+                inspection.incomplete,
+                inspection.settings
+            );
+        }
+        if !docker_enabled
+            && inspections
+                .iter()
+                .any(|i| i.profile == crate::config_inspection::Profile::DockerDaemon)
+        {
+            inspection_report.push_str("Docker settings were not applied because the Docker service was not persistently enabled in the inventory.\n");
+        }
+        create_file(
+            &dir.join("configuration-inspections.json"),
+            &(serde_json::to_string_pretty(inspections)? + "\n"),
+        )?;
+    }
     create_file(
         &dir.join("migration-report.md"),
-        &format!("{}\n## Target draft\n\n- Nixpkgs revision: `{}` (not yet resolved or validated).\n- Explicit desktop selection: {}.\n- No flake.lock was generated.\n- Supply reviewed hardware, boot, filesystems, users, networking and system.stateVersion before use.\n", report(inventory, &decisions), revision, selected.map(|kind| format!("{kind:?}")).unwrap_or_else(|| "none".into())),
+        &format!("{}{}\n## Target draft\n\n- Nixpkgs revision: `{}` (not yet resolved or validated).\n- Explicit desktop selection: {}.\n- No flake.lock was generated.\n- Supply reviewed hardware, boot, filesystems, users, networking and system.stateVersion before use.\n", report(inventory, &decisions), inspection_report, revision, selected.map(|kind| format!("{kind:?}")).unwrap_or_else(|| "none".into())),
     )?;
     let mut sorted = inventory.clone();
     sorted.packages.sort_by(|a, b| a.name.cmp(&b.name));

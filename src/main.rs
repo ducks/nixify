@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use nixify::{
-    baseline, desktop::DesktopKind, draft, inventory::Inventory, manjaro, mapping, output, suggest,
+    baseline, config_inspection, desktop::DesktopKind, draft, inventory::Inventory, manjaro,
+    mapping, output, suggest,
 };
 use std::{
     fs::{File, OpenOptions},
@@ -21,6 +22,19 @@ struct Cli {
 enum DesktopSelection {
     Hyprland,
     Xfce,
+}
+#[derive(Clone, Copy, ValueEnum)]
+enum ConfigProfile {
+    Hyprland,
+    DockerDaemon,
+}
+impl From<ConfigProfile> for config_inspection::Profile {
+    fn from(value: ConfigProfile) -> Self {
+        match value {
+            ConfigProfile::Hyprland => Self::Hyprland,
+            ConfigProfile::DockerDaemon => Self::DockerDaemon,
+        }
+    }
 }
 impl From<DesktopSelection> for DesktopKind {
     fn from(value: DesktopSelection) -> Self {
@@ -54,6 +68,18 @@ enum Command {
         /// Explicitly choose a desktop to enable; detection alone remains a hint.
         #[arg(long, value_enum)]
         desktop: Option<DesktopSelection>,
+        /// Include sanitized, explicitly generated configuration inspection(s).
+        #[arg(long)]
+        config_inspection: Vec<PathBuf>,
+    },
+    /// Inspect an explicitly selected configuration file using a supported profile.
+    InspectConfig {
+        #[arg(long, value_enum)]
+        profile: ConfigProfile,
+        #[arg(long)]
+        file: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
     },
     /// Check Nix syntax without resolving inputs, building, or activating.
     Validate {
@@ -133,6 +159,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             nixpkgs_rev,
             reviewed_mappings,
             desktop,
+            config_inspection: inspection_paths,
         } => {
             let inventory = read_inventory(&input)?;
             let revision = match nixpkgs_rev {
@@ -143,14 +170,41 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Some(path) => mapping::read_reviewed(&path).map_err(std::io::Error::other)?,
                 None => mapping::ReviewedMappings::empty(),
             };
-            output::generate_with_desktop(
+            let mut inspections = Vec::new();
+            for path in inspection_paths {
+                let text =
+                    config_inspection::read_explicit(&path).map_err(std::io::Error::other)?;
+                let inspection: config_inspection::Inspection = serde_json::from_str(&text)?;
+                inspection.validate().map_err(std::io::Error::other)?;
+                inspections.push(inspection);
+            }
+            output::generate_with_inspections(
                 &inventory,
                 &dir,
                 &revision,
                 &reviewed,
                 desktop.map(Into::into),
+                &inspections,
             )?;
             eprintln!("Wrote migration draft to {}", dir.display());
+        }
+        Command::InspectConfig {
+            profile,
+            file,
+            output,
+        } => {
+            let content = config_inspection::read_explicit(&file).map_err(std::io::Error::other)?;
+            let inspection = config_inspection::inspect(profile.into(), &content)
+                .map_err(std::io::Error::other)?;
+            let data = serde_json::to_string_pretty(&inspection)? + "\n";
+            #[cfg(unix)]
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            options.open(&output)?.write_all(data.as_bytes())?;
+            eprintln!("Wrote sanitized inspection to {}", output.display());
         }
         Command::Validate {
             directory,
