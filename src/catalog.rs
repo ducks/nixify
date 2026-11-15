@@ -56,6 +56,31 @@ fn text(value: Option<&Value>, max: usize) -> Option<String> {
     }
 }
 
+// These are search hints only; names from different distributions can collide.
+fn probes(name: &str, foreign: bool) -> Vec<(String, &'static str)> {
+    let name = name.to_ascii_lowercase();
+    let mut results = vec![(name.clone(), "exact")];
+    if foreign {
+        for suffix in ["-bin", "-git"] {
+            if let Some(base) = name.strip_suffix(suffix).filter(|s| !s.is_empty()) {
+                results.push((base.to_string(), "foreign_suffix_removed"));
+            }
+        }
+    }
+    for prefix in ["python-", "xorg-", "ttf-"] {
+        if let Some(base) = name.strip_prefix(prefix).filter(|s| !s.is_empty()) {
+            results.push((base.to_string(), "distribution_prefix_removed"));
+        }
+    }
+    if ["grep", "sed", "tar"].contains(&name.as_str()) {
+        results.push((format!("gnu{name}"), "gnu_prefix_added"));
+    }
+    if name == "procps-ng" {
+        results.push(("procps".into(), "known_name_variant"));
+    }
+    results
+}
+
 pub fn from_value(
     inventory: &Inventory,
     catalog: &Value,
@@ -125,21 +150,13 @@ pub fn from_value(
         .filter(|p| p.explicitly_installed && unresolved.contains(&p.name))
     {
         let raw = package.name.to_ascii_lowercase();
-        let mut probes = vec![(raw.clone(), false)];
-        if package.foreign {
-            for suffix in ["-bin", "-git"] {
-                if let Some(base) = raw.strip_suffix(suffix).filter(|s| !s.is_empty()) {
-                    probes.push((base.to_string(), true));
-                }
-            }
-        }
         let mut found = BTreeMap::new();
-        for (key, stripped) in probes {
+        for (key, probe_kind) in probes(&raw, package.foreign) {
             if let Some(items) = index.get(&key) {
                 for (attribute, pname, version, description) in items {
                     let leaf = attribute.rsplit('.').next().unwrap_or("");
-                    let kind = if stripped {
-                        "foreign_suffix_removed"
+                    let kind = if probe_kind != "exact" {
+                        probe_kind
                     } else if leaf.eq_ignore_ascii_case(&raw) {
                         "attribute_leaf"
                     } else {
@@ -280,15 +297,11 @@ pub fn read(inventory: &Inventory, path: &Path, revision: &str) -> Result<Catalo
         .iter()
         .filter(|p| p.explicitly_installed && unresolved.contains(&p.name))
     {
-        let name = package.name.to_ascii_lowercase();
-        wanted.insert(name.clone());
-        if package.foreign {
-            for suffix in ["-bin", "-git"] {
-                if let Some(base) = name.strip_suffix(suffix).filter(|s| !s.is_empty()) {
-                    wanted.insert(base.to_string());
-                }
-            }
-        }
+        wanted.extend(
+            probes(&package.name, package.foreign)
+                .into_iter()
+                .map(|(name, _)| name),
+        );
     }
     let file = File::open(path).map_err(|e| format!("cannot open catalog: {e}"))?;
     if file

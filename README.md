@@ -111,7 +111,8 @@ Pass it explicitly to `nixify report --input inventory.json --reviewed-mappings 
 The `catalog-suggest` command reads the decompressed `packages.json` channel
 catalog also used by NixOS Search's `flake-info`. It searches unresolved,
 explicitly installed packages locally, including nested attribute names and
-possible `-bin`/`-git` variants for foreign packages. It does not contact a
+possible `-bin`/`-git` variants for foreign packages, plus selected distro
+naming conventions such as `grep`/`gnugrep` and `xorg-xinit`/`xinit`. It does not contact a
 server, select mappings, or modify the draft. Results are candidates only: a
 name match does not establish equivalence, provenance, buildability or target
 availability. Catalog reports disclose installed software.

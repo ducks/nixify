@@ -1308,3 +1308,45 @@ fn channel_catalog_rejects_bad_wrapper_and_trailing_data() {
         assert!(catalog::read(&fixture(), &file, revision).is_err());
     }
 }
+
+#[test]
+fn catalog_suggests_distribution_name_variants_without_promoting_them() {
+    use nixify::inventory::Package;
+    let mut inv = fixture();
+    for name in ["grep", "python-pipx", "xorg-xinit", "procps-ng"] {
+        inv.packages.push(Package {
+            name: name.into(),
+            version: "1".into(),
+            explicitly_installed: true,
+            foreign: false,
+            evidence: vec![],
+        });
+    }
+    let data = serde_json::json!({"packages": {
+        "gnugrep": {"pname":"gnugrep"}, "pipx": {"pname":"pipx"},
+        "xinit": {"pname":"xinit"}, "procps": {"pname":"procps"}
+    }});
+    let report =
+        nixify::catalog::from_value(&inv, &data, "0123456789abcdef0123456789abcdef01234567")
+            .unwrap();
+    for (name, attribute, kind) in [
+        ("grep", "gnugrep", "gnu_prefix_added"),
+        ("python-pipx", "pipx", "distribution_prefix_removed"),
+        ("xorg-xinit", "xinit", "distribution_prefix_removed"),
+        ("procps-ng", "procps", "known_name_variant"),
+    ] {
+        let entry = report
+            .matches
+            .iter()
+            .find(|entry| entry.source_package == name)
+            .unwrap();
+        assert!(entry
+            .candidates
+            .iter()
+            .any(|candidate| candidate.attribute == attribute && candidate.match_kind == kind));
+        assert_eq!(
+            mapping::decision(inv.packages.iter().find(|p| p.name == name).unwrap()).status,
+            Status::Unmapped
+        );
+    }
+}
