@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use nixify::{
-    baseline, config_inspection, desktop::DesktopKind, draft, inventory::Inventory, manjaro,
-    mapping, output, suggest,
+    baseline, catalog, config_inspection, desktop::DesktopKind, draft, inventory::Inventory,
+    manjaro, mapping, output, suggest,
 };
 use std::{
     fs::{File, OpenOptions},
@@ -107,6 +107,18 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Suggest matches using an existing Nixpkgs packages.json catalog.
+    CatalogSuggest {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        catalog: PathBuf,
+        /// Full Nixpkgs revision associated with the catalog (not authenticated).
+        #[arg(long)]
+        revision: String,
+        #[arg(long)]
+        output: PathBuf,
+    },
     /// Explain curated mapping coverage and unresolved packages.
     Report {
         #[arg(long)]
@@ -133,6 +145,28 @@ fn read_inventory(path: &Path) -> Result<Inventory, Box<dyn std::error::Error>> 
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     match Cli::parse().command {
+        Command::CatalogSuggest {
+            input,
+            catalog: source,
+            revision,
+            output,
+        } => {
+            let inventory = read_inventory(&input)?;
+            let report =
+                catalog::read(&inventory, &source, &revision).map_err(std::io::Error::other)?;
+            let data = serde_json::to_string_pretty(&report)? + "\n";
+            #[cfg(unix)]
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            options.open(&output)?.write_all(data.as_bytes())?;
+            eprintln!(
+                "Wrote unreviewed catalog candidates to {}",
+                output.display()
+            );
+        }
         Command::Scan {
             distro,
             output: destination,

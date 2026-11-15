@@ -1,4 +1,5 @@
 pub mod baseline;
+pub mod catalog;
 pub mod config_evidence;
 pub mod config_inspection;
 pub mod desktop;

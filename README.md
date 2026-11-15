@@ -106,6 +106,42 @@ After checking individual packages yourself, create a review file. This example 
 
 Pass it explicitly to `nixify report --input inventory.json --reviewed-mappings review.json` or `nixify generate --input inventory.json --output ./nixos-migration --reviewed-mappings review.json`. Each source must be explicitly installed; foreign packages can also be overridden by explicit review. Attribute values are dot-separated Nixpkgs paths such as `xfce.exo`, not arbitrary Nix expressions; each path component is validated and quoted. If the review declares a revision, it must match the generated flake pin. The report labels these as user-reviewed, not automatically verified; use `validate --nixpkgs` to check attribute existence. Review files and suggestions disclose installed software and should be protected like inventories.
 
+## Optional NixOS Search catalog
+
+The `catalog-suggest` command reads the decompressed `packages.json` channel
+catalog also used by NixOS Search's `flake-info`. It searches unresolved,
+explicitly installed packages locally, including nested attribute names and
+possible `-bin`/`-git` variants for foreign packages. It does not contact a
+server, select mappings, or modify the draft. Results are candidates only: a
+name match does not establish equivalence, provenance, buildability or target
+availability. Catalog reports disclose installed software.
+
+For example, obtain a channel catalog and its revision from the **same resolved
+release** (the channel itself moves). This requires `curl` and `brotli`, and
+the decompressed JSON can occupy hundreds of megabytes:
+
+```sh
+curl -fsSL -o packages.json.br -w '%{url_effective}' \
+  https://channels.nixos.org/nixos-26.05/packages.json.br > catalog-url.txt
+catalog_url=$(cat catalog-url.txt)
+curl -fsSL "${catalog_url%/*}/git-revision" -o catalog-revision.txt
+brotli --decompress --keep packages.json.br
+nixify catalog-suggest --input inventory.json --catalog packages.json \
+  --revision "$(cat catalog-revision.txt)" --output catalog-matches.json
+```
+
+This example uses the NixOS 26.05 stable channel. The catalog is streamed and
+limited to 1 GiB uncompressed. The revision is user-supplied metadata and is
+not authenticated against the catalog; compare it with your intended target pin.
+Nixify currently defaults its generated flake to the revision in its own
+`flake.lock`, which tracks nixos-unstable. To use this catalog revision as the
+target instead, pass `--nixpkgs-rev "$(cat catalog-revision.txt)"` to
+`nixify generate`; the generated flake still needs to be resolved and validated. Downloading the public catalog does not send the
+inventory to NixOS, and matching happens locally. An existing `packages.json`
+from a fixed release can be reused offline. The report does not establish that
+a match is available on the selected architecture. See the [NixOS Search
+flake-info documentation](https://github.com/NixOS/nixos-search/tree/main/flake-info#nixpkgs).
+
 ## Optional NixOS baseline
 
 With Nix installed, evaluate a local Nixpkgs checkout (this does not build or activate a system), then compare names:

@@ -1218,3 +1218,93 @@ fn cli_inspects_config_and_generates_draft_without_raw_values() {
         .unwrap()
         .contains("do-not-export"));
 }
+
+#[test]
+fn catalog_suggestions_are_ranked_unreviewed_and_handle_nested_names() {
+    use nixify::{catalog, inventory::Package};
+    let mut inv = fixture();
+    for (name, foreign) in [("helix-bin", true), ("mystery", false)] {
+        inv.packages.push(Package {
+            name: name.into(),
+            version: "1".into(),
+            explicitly_installed: true,
+            foreign,
+            evidence: vec![],
+        });
+    }
+    let catalog_data = serde_json::json!({
+        "editors.helix": {"pname":"helix", "version":"1", "meta":{"description":"A text editor"}},
+        "tools.hidden": {"pname":"mystery", "version":"2", "meta":{"description":"Different attribute name"}},
+        "others.mystery": {"pname":"other", "version":"3"},
+        "evil\";abort": {"pname":"mystery"}
+    });
+    let report = catalog::from_value(
+        &inv,
+        &catalog_data,
+        "0123456789abcdef0123456789abcdef01234567",
+    )
+    .unwrap();
+    let helix = report
+        .matches
+        .iter()
+        .find(|m| m.source_package == "helix-bin")
+        .unwrap();
+    assert_eq!(helix.candidates[0].attribute, "editors.helix");
+    assert_eq!(helix.candidates[0].match_kind, "foreign_suffix_removed");
+    let mystery = report
+        .matches
+        .iter()
+        .find(|m| m.source_package == "mystery")
+        .unwrap();
+    assert_eq!(mystery.candidates.len(), 2);
+    assert_eq!(mystery.candidates[0].attribute, "others.mystery");
+    assert_eq!(mystery.candidates[1].match_kind, "package_name");
+    assert!(report.warning.contains("not equivalence"));
+    assert!(catalog::from_value(&inv, &catalog_data, "invalid").is_err());
+}
+
+#[test]
+fn catalog_cli_reads_offline_and_never_overwrites() {
+    let root = tempfile::tempdir().unwrap();
+    let inv = root.path().join("inventory.json");
+    let catalog = root.path().join("packages.json");
+    let out = root.path().join("matches.json");
+    fs::write(&inv, serde_json::to_vec(&fixture()).unwrap()).unwrap();
+    fs::write(&catalog, r#"{"packages":{"tools.foreign-tool":{"pname":"foreign-tool","version":"1","meta":{"description":"Example"}}},"version":"fixture"}"#).unwrap();
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_nixify"))
+            .args(["catalog-suggest", "--input"])
+            .arg(&inv)
+            .args(["--catalog"])
+            .arg(&catalog)
+            .args([
+                "--revision",
+                "0123456789abcdef0123456789abcdef01234567",
+                "--output",
+            ])
+            .arg(&out)
+            .output()
+            .unwrap()
+    };
+    assert!(run().status.success());
+    let data = fs::read_to_string(&out).unwrap();
+    assert!(data.contains("tools.foreign-tool"));
+    assert!(!run().status.success());
+    assert_eq!(fs::read_to_string(&out).unwrap(), data);
+}
+
+#[test]
+fn channel_catalog_rejects_bad_wrapper_and_trailing_data() {
+    use nixify::catalog;
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("packages.json");
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    for text in [
+        r#"{"version":"1"}"#,
+        r#"{"packages":{}} trailing"#,
+        r#"{"packages":{},"packages":{}}"#,
+    ] {
+        fs::write(&file, text).unwrap();
+        assert!(catalog::read(&fixture(), &file, revision).is_err());
+    }
+}
