@@ -47,6 +47,27 @@ unknown, not BIOS; loop devices are omitted. No partition, filesystem or boot
 configuration is generated. USB devices, fstab, Wi-Fi settings and detailed hardware
 configuration are not scanned yet. Review the inventory before sharing it. Network inventory records interface-type counts, resolver categories and installed firewall package names; it does not retain interface names, addresses, DNS search domains, hostname or credentials. These summaries can still reveal aspects of your network or security posture.
 
+## Optional NixOS hardware suggestions
+
+If `nixos-generate-config` from `nixos-install-tools` is available on `PATH`,
+nixify can capture its hardware-only output without asking it to write into
+`/etc/nixos`:
+
+```sh
+nixify hardware-config --output hardware-configuration.nix
+```
+
+This optional command invokes `nixos-generate-config --show-hardware-config
+--no-filesystems`; normal scanning and generation still work without Nix. The
+new file is owner-only and never overwrites an existing file. Review it before
+copying or importing it into the generated draft; nixify does not import it
+automatically. Hardware suggestions may contain machine-identifying information.
+
+`--include-filesystems` omits `--no-filesystems` and may include identifiers and
+mounts for the **currently running source system**. Those are not necessarily
+the intended NixOS target. This does not detect a future partition layout,
+install NixOS, or establish that the generated system will boot.
+
 ## Configuration locations
 
 The report identifies selected configuration locations for installed packages, including SSH, Docker, Lemurs, Hyprland, Waybar, Kitty, Neovim and Zsh. It checks metadata only and does not copy or interpret file contents. User locations refer to the scanning account’s `$HOME`; alternate locations and other users are not scanned. A symlink is reported without following it, and a missing file does not prove that the application has no configuration. Existing inventories without this field remain usable.

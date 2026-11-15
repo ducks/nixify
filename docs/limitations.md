@@ -11,3 +11,5 @@
 - Opt-in file-content inspection covers only two Hyprland settings and Docker live-restore. It omits unrecognized values, does not follow final symlinks or resolve includes, and does not migrate application data or user configuration files.
 
 - Offline NixOS channel-catalog matches are name-based suggestions, not semantic or architecture verification. Their declared revision is supplied by the user and is not authenticated against the catalog.
+
+- Optional `hardware-config` requires `nixos-generate-config` and captures its output for manual review. It does not configure the target disk or bootloader; source filesystem declarations, if explicitly requested, may be inappropriate for the destination.

@@ -53,6 +53,14 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Capture hardware-only output from the installed NixOS configuration generator.
+    HardwareConfig {
+        #[arg(long)]
+        output: PathBuf,
+        /// Include currently mounted filesystems; review carefully for the intended target.
+        #[arg(long)]
+        include_filesystems: bool,
+    },
     /// Generate a package module and migration report in a new directory.
     Generate {
         #[arg(long)]
@@ -145,6 +153,24 @@ fn read_inventory(path: &Path) -> Result<Inventory, Box<dyn std::error::Error>> 
 }
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     match Cli::parse().command {
+        Command::HardwareConfig {
+            output,
+            include_filesystems,
+        } => {
+            let config = nixify::hardware::generate_config_with(include_filesystems, |program, args| {
+                manjaro::run_bounded(program, args, false).map_err(|error| {
+                    format!("hardware generation failed: {error}; install nixos-generate-config from nixos-install-tools and ensure it is on PATH")
+                })
+            }).map_err(std::io::Error::other)?;
+            #[cfg(unix)]
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            options.open(&output)?.write_all(config.as_bytes())?;
+            eprintln!("Wrote hardware suggestions to {}. Review before use; filesystem settings may describe the source machine, not the intended target.", output.display());
+        }
         Command::CatalogSuggest {
             input,
             catalog: source,

@@ -1350,3 +1350,51 @@ fn catalog_suggests_distribution_name_variants_without_promoting_them() {
         );
     }
 }
+
+#[test]
+fn hardware_generator_uses_show_mode_and_excludes_filesystems_by_default() {
+    let config = nixify::hardware::generate_config_with(false, |program, args| {
+        assert_eq!(program, "nixos-generate-config");
+        assert_eq!(args, ["--show-hardware-config", "--no-filesystems"]);
+        Ok("{ ... }: {}\n".into())
+    })
+    .unwrap();
+    assert!(config.contains("{ ... }"));
+    nixify::hardware::generate_config_with(true, |_, args| {
+        assert_eq!(args, ["--show-hardware-config"]);
+        Ok("{}".into())
+    })
+    .unwrap();
+    assert!(nixify::hardware::generate_config_with(false, |_, _| Ok(String::new())).is_err());
+}
+
+#[test]
+fn hardware_config_cli_captures_stdout_without_overwriting() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let fake = root.path().join("nixos-generate-config");
+    fs::write(&fake, "#!/bin/sh\n[ \"$1\" = --show-hardware-config ] && [ \"$2\" = --no-filesystems ] || exit 2\nprintf '{ ... }: {}\\n'\n").unwrap();
+    fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+    let target = root.path().join("hardware.nix");
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_nixify"))
+            .args(["hardware-config", "--output"])
+            .arg(&target)
+            .env("PATH", root.path())
+            .output()
+            .unwrap()
+    };
+    let first = run();
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    assert_eq!(fs::read_to_string(&target).unwrap(), "{ ... }: {}\n");
+    assert_eq!(
+        fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert!(!run().status.success());
+    assert_eq!(fs::read_to_string(&target).unwrap(), "{ ... }: {}\n");
+}
