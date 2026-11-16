@@ -44,7 +44,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("runner", type=pathlib.Path)
     parser.add_argument("workdir", type=pathlib.Path)
-    parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--timeout", type=int, default=1800,
+                        help="total seconds including store image creation (default: 1800)")
     parser.add_argument("--expect-command", type=command_name, action="append", default=[],
                         help="require this executable in the guest (repeatable)")
     args = parser.parse_args()

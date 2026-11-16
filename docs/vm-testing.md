@@ -31,6 +31,9 @@ fail the smoke test if a required command is unavailable. Command availability
 is not evidence that the graphical session or application works correctly.
 If the build fails on an unfree package, review the package and target license
 policy before proceeding; the generated draft deliberately does not enable it.
+The runner's 30-minute default timeout includes creating and populating the VM's
+private store image, which can take a long time for a large closure. Override it
+with `--timeout` (seconds) when appropriate.
 
 For the console parser's offline tests, run:
 
