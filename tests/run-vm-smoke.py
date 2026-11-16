@@ -29,11 +29,24 @@ def test_done(buffer):
     return b"\nNIXIFY_VM_TEST_DONE\n" in plain_console(buffer)
 
 
+def command_name(value):
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.+-]{0,127}", value):
+        raise argparse.ArgumentTypeError("expected a command name without a path or shell syntax")
+    return value
+
+
+def missing_commands(buffer, expected):
+    lines = set(plain_console(buffer).decode("utf-8", errors="replace").splitlines())
+    return [name for name in expected if f"NIXIFY_COMMAND_{name}=present" not in lines]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("runner", type=pathlib.Path)
     parser.add_argument("workdir", type=pathlib.Path)
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--expect-command", type=command_name, action="append", default=[],
+                        help="require this executable in the guest (repeatable)")
     args = parser.parse_args()
     runner = args.runner.resolve(strict=True)
     content = runner.read_text()
@@ -74,9 +87,11 @@ def main():
                         # Remove terminal colors and title sequences before matching.
                         clean = plain_console(buffer)
                         if not sent and guest_prompt(buffer):
+                            commands_to_check = list(dict.fromkeys(["firefox", "nvim", "htop", *args.expect_command]))
+                            command_words = " ".join(commands_to_check)  # command_name permits only shell-safe names
                             commands = (
                                 "printf '\\nNIXIFY_VM_BOOT_OK\\n'; "
-                                "for cmd in firefox nvim htop; do "
+                                f"for cmd in {command_words}; do "
                                 "if command -v \"$cmd\" >/dev/null; then printf 'NIXIFY_COMMAND_%s=present\\n' \"$cmd\"; "
                                 "else printf 'NIXIFY_COMMAND_%s=absent\\n' \"$cmd\"; fi; done; "
                                 "printf 'NIXIFY_SYSTEM_STATE='; systemctl is-system-running || true; "
@@ -89,6 +104,9 @@ def main():
                 code = proc.poll()
                 if code is not None:
                     if code == 0 and saw_marker:
+                        missing = missing_commands(buffer, args.expect_command)
+                        if missing:
+                            raise RuntimeError(f"expected guest commands missing: {', '.join(missing)}; log: {log_path}")
                         print(f"VM boot and console smoke test passed; console log: {log_path}")
                         for line in clean.decode("utf-8", errors="replace").splitlines():
                             if line.startswith(("NIXIFY_COMMAND_", "NIXIFY_SYSTEM_STATE=")):

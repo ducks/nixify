@@ -26,6 +26,12 @@ The channel path and `.git-revision` above are examples; use a trusted checkout 
 
 The runner checks the generated VM script for the expected network and host-share settings; use it **only with the trusted VM produced by this harness**, not arbitrary VM scripts. It starts a fresh virtual disk, waits for the guest console, reports the presence of a few example commands and systemd state, then powers off the guest. Console output is saved to `runtime/console.log`, and both disk and store image remain inside `$vm_work`. Protect the inventory and logs as machine-sensitive data. You can remove this test directory yourself when you no longer need it. Since `--no-out-link` creates no GC root, Nix garbage collection may remove the built VM closure later.
 
+Add `--expect-command Hyprland` (or repeat the option for other executables) to
+fail the smoke test if a required command is unavailable. Command availability
+is not evidence that the graphical session or application works correctly.
+If the build fails on an unfree package, review the package and target license
+policy before proceeding; the generated draft deliberately does not enable it.
+
 For the console parser's offline tests, run:
 
 ```sh
