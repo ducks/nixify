@@ -86,6 +86,9 @@ fn conservative_mapping_and_deterministic_output() {
     assert_eq!(a, output::packages_nix(&mapping::decisions(&inv)));
     assert!(!a.contains("foreign-tool"));
     assert!(!a.contains("libexample"));
+    let report = output::report(&inv, &mapping::decisions(&inv));
+    assert!(report.contains("this draft does not enable unfree packages"));
+    assert!(report.contains("checks do not establish buildability"));
 }
 #[test]
 fn schema_version_and_injection_are_rejected() {
@@ -156,6 +159,31 @@ fn cli_generates_and_reports_without_nix() {
             0o600
         );
     }
+}
+
+#[test]
+fn report_handles_a_closed_stdout_pipe() {
+    use std::process::Stdio;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let file = tmp.path().join("inventory.json");
+    fs::write(&file, serde_json::to_vec(&fixture()).unwrap()).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .arg("report")
+        .arg("--input")
+        .arg(&file)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let result = child.wait_with_output().unwrap();
+    assert!(result.status.success());
+    assert!(
+        result.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
 }
 
 #[test]

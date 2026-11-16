@@ -19,6 +19,11 @@ nixify validate ./nixos-migration
 
 Generated `packages.nix` includes explicitly installed packages with curated mappings and inferred matches whose source and Nixpkgs catalog entries share a name and upstream homepage. The report labels inferred entries and their limitations, including when a foreign package happens to match AUR. Same-project packages may still differ, and foreign status does not prove AUR provenance. Dependencies are not promoted to direct packages; weak and unmapped matches remain in the report. Target revision, package features, platform support and behavior still need checking. Package mappings do not configure login shells, services, graphical sessions or application data. Output directories and inventory files must not exist already: existing work is never overwritten.
 
+Some mapped packages may be classified as unfree by the selected Nixpkgs
+revision. Attribute-existence and partial module checks do not guarantee a
+system build will evaluate successfully. Review package licenses and configure
+your own Nixpkgs policy where needed; nixify does not enable unfree packages.
+
 `services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. The allowlist includes Bluetooth, printing, Avahi, libvirt, TLP, Ollama and Mullvad. On the checked Nixpkgs revision, Mullvad changes reverse-path firewall checking to loose; review target-specific effects before use. Service names and status are included in the inventory and may reveal sensitive information.
 
 

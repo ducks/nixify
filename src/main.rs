@@ -151,6 +151,15 @@ fn read_inventory(path: &Path) -> Result<Inventory, Box<dyn std::error::Error>> 
     inventory.validate().map_err(std::io::Error::other)?;
     Ok(inventory)
 }
+// Unlike std's printing macros, these propagate a closed stdout pipe as an
+// ordinary I/O error so commands like `nixify report ... | head` work cleanly.
+macro_rules! println {
+    ($($arg:tt)*) => { writeln!(std::io::stdout().lock(), $($arg)*)? };
+}
+macro_rules! print {
+    ($($arg:tt)*) => { write!(std::io::stdout().lock(), $($arg)*)? };
+}
+
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     match Cli::parse().command {
         Command::HardwareConfig {
@@ -419,6 +428,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 fn main() {
     if let Err(e) = run() {
+        if e.downcast_ref::<std::io::Error>()
+            .is_some_and(|error| error.kind() == std::io::ErrorKind::BrokenPipe)
+        {
+            return;
+        }
         eprintln!("nixify: {e}");
         std::process::exit(1);
     }
