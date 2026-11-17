@@ -1426,3 +1426,153 @@ fn hardware_config_cli_captures_stdout_without_overwriting() {
     assert!(!run().status.success());
     assert_eq!(fs::read_to_string(&target).unwrap(), "{ ... }: {}\n");
 }
+
+#[test]
+fn verified_coverage_is_default_revision_scoped_and_auditable() {
+    use nixify::{desktop::DesktopKind, draft, inventory::Scope, systemd};
+    let mut inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "bzip2 1\ndocker 1\nhyprland 1\nnetworkmanager 1\nfirefox 1\n",
+        "bzip2\ndocker\nhyprland\nnetworkmanager\nfirefox\n",
+        "",
+    )
+    .unwrap();
+    inventory.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("docker.service enabled enabled\nNetworkManager.service enabled enabled\n"),
+        None,
+    )];
+    let revision = "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a";
+    let temp = tempfile::tempdir().unwrap();
+    let dest = temp.path().join("draft");
+    output::generate_with_desktop(
+        &inventory,
+        &dest,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        Some(DesktopKind::Hyprland),
+    )
+    .unwrap();
+    let packages = fs::read_to_string(dest.join("packages.nix")).unwrap();
+    let decisions: Vec<mapping::Decision> =
+        serde_json::from_slice(&fs::read(dest.join("package-decisions.json")).unwrap()).unwrap();
+    for name in ["bzip2", "docker", "hyprland", "networkmanager"] {
+        let decision = decisions.iter().find(|d| d.package == name).unwrap();
+        assert!(decision.covered_by.is_some(), "{name}: {decision:?}");
+        assert!(!packages.contains(&format!("pkgs.\"{name}\"")));
+    }
+    assert!(packages.contains("pkgs.\"firefox\""));
+    let report = fs::read_to_string(dest.join("migration-report.md")).unwrap();
+    assert!(report.contains("Direct package entries omitted"));
+    assert!(report.contains("programs.hyprland.enable"));
+    let (_, attrs) = draft::expected_attributes(&dest, &inventory).unwrap();
+    assert!(attrs.contains(&"firefox".to_owned()));
+    assert!(!attrs.contains(&"docker".to_owned()));
+    let services = fs::read_to_string(dest.join("services.nix")).unwrap();
+    fs::write(
+        dest.join("services.nix"),
+        services.replace("virtualisation.docker.enable = true;", "# disabled"),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&dest, &inventory)
+        .unwrap_err()
+        .contains("services.nix was edited"));
+    fs::write(dest.join("services.nix"), services).unwrap();
+    let desktop = fs::read_to_string(dest.join("desktop.nix")).unwrap();
+    fs::write(
+        dest.join("desktop.nix"),
+        desktop.replace("programs.hyprland.enable = true;", "# disabled"),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&dest, &inventory)
+        .unwrap_err()
+        .contains("desktop.nix was edited"));
+
+    let inspection = nixify::config_inspection::inspect(
+        nixify::config_inspection::Profile::DockerDaemon,
+        r#"{"live-restore":true}"#,
+    )
+    .unwrap();
+    let inspected = temp.path().join("inspected");
+    output::generate_with_inspections(
+        &inventory,
+        &inspected,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        Some(DesktopKind::Hyprland),
+        &[inspection],
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&inspected, &inventory).is_ok());
+
+    let mut no_evidence = mapping::decisions(&inventory);
+    nixify::coverage::apply(
+        &inventory,
+        &mut no_evidence,
+        &"0".repeat(40),
+        Some(DesktopKind::Hyprland),
+    );
+    assert!(no_evidence.iter().all(|d| d.covered_by.is_none()));
+    inventory.source.architecture = "aarch64".into();
+    nixify::coverage::apply(
+        &inventory,
+        &mut no_evidence,
+        revision,
+        Some(DesktopKind::Hyprland),
+    );
+    assert!(no_evidence.iter().all(|d| d.covered_by.is_none()));
+}
+
+#[test]
+fn coverage_does_not_override_review_foreign_or_runtime_only_services() {
+    use nixify::{desktop::DesktopKind, inventory::Scope, systemd};
+    let mut inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "bzip2 1\ndocker 1\nhyprland 1\nnetworkmanager 1\n",
+        "bzip2\ndocker\nhyprland\nnetworkmanager\n",
+        "bzip2\n",
+    )
+    .unwrap();
+    inventory.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("docker.service enabled-runtime enabled\nNetworkManager.service enabled enabled\n"),
+        None,
+    )];
+    let review = mapping::ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: None,
+        mappings: vec![mapping::ReviewedMapping {
+            source_package: "networkmanager".into(),
+            nixpkgs_attribute: "networkmanager".into(),
+        }],
+    };
+    let revision = "9fbb54b33e91ee4ca368e35a78e0613c720600b3";
+    let mut decisions = mapping::reviewed_decisions(&inventory, &review, Some(revision)).unwrap();
+    nixify::coverage::apply(&inventory, &mut decisions, revision, None);
+    for name in ["bzip2", "docker", "hyprland", "networkmanager"] {
+        assert!(
+            decisions
+                .iter()
+                .find(|d| d.package == name)
+                .unwrap()
+                .covered_by
+                .is_none(),
+            "{name}"
+        );
+    }
+    // Explicit desktop selection only applies when the target revision is verified.
+    nixify::coverage::apply(
+        &inventory,
+        &mut decisions,
+        revision,
+        Some(DesktopKind::Hyprland),
+    );
+    assert!(decisions
+        .iter()
+        .find(|d| d.package == "hyprland")
+        .unwrap()
+        .covered_by
+        .is_some());
+}

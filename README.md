@@ -24,6 +24,22 @@ revision. Attribute-existence and partial module checks do not guarantee a
 system build will evaluate successfully. Review package licenses and configure
 your own Nixpkgs policy where needed; nixify does not enable unfree packages.
 
+For two explicitly checked Nixpkgs revisions on x86_64, generation omits a
+small set of direct package entries already supplied by the NixOS base system
+or by generated Docker, NetworkManager, and explicitly selected Hyprland
+modules. Each omission and its provider appear in `migration-report.md` and
+`package-decisions.json`. This does not prove the source and target software
+behave identically. If you disable a providing module, override its package,
+or change NixOS default packages, review the affected entries and add them
+back if needed. Foreign packages and explicit `--reviewed-mappings` overrides
+are never omitted by these rules. Other revisions and architectures keep the
+direct entries; no Nix installation or network access is required to generate.
+The initial rules remove only a small fraction of distribution-provided
+packages; the rest still need review. For drafts with omissions, the optional
+attribute check also requires the generated configuration, service, and desktop
+modules to remain unchanged; if they were edited, it stops and asks for review.
+Syntax validation remains available for edited drafts.
+
 `services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. The allowlist includes Bluetooth, printing, Avahi, libvirt, TLP, Ollama and Mullvad. On the checked Nixpkgs revision, Mullvad changes reverse-path firewall checking to loose; review target-specific effects before use. Service names and status are included in the inventory and may reveal sensitive information.
 
 

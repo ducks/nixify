@@ -19,3 +19,24 @@ Explicit `inspect-config` profiles parse only selected files through bounded rea
 `catalog` streams the official channel `packages.json` format, retaining only entries relevant to unresolved explicit packages. It records a user-declared revision, ranks exact attribute leaves and package names ahead of foreign suffix-stripped and distro name-variant hints, and never treats a catalog result as an accepted mapping or proof of target platform availability. Catalog generation/download is explicit; matching is offline.
 
 Optional `hardware-config` invokes the existing NixOS generator with `--show-hardware-config`, and defaults to `--no-filesystems`. It writes only the requested new owner-only output file and does not import it into a draft. Generated hardware information and any opt-in source filesystem declarations require review for the intended target. The normal scanner does not require Nix.
+# Revision-scoped package coverage
+
+Offline generation recognizes a deliberately small set of direct entries
+provided by the default NixOS system path or by explicitly generated Docker,
+NetworkManager, and Hyprland modules. Rules require an exact source name and
+target attribute, an x86_64 target, and one of two checked revisions. Foreign
+packages and user-reviewed mappings take precedence and remain direct entries.
+Coverage is stored alongside each package decision and explained in the report.
+It establishes only how the generated target supplies an attribute under its
+default settings; it does not establish source-to-target behavioral equivalence.
+If a provider or defaults are changed after generation, review its omissions.
+
+The checked sources are `nixos/modules/config/system-path.nix`,
+`nixos/modules/virtualisation/docker.nix`,
+`nixos/modules/services/networking/networkmanager.nix`, and
+`nixos/modules/programs/wayland/hyprland.nix` in Nixpkgs revisions
+`eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a` and
+`9fbb54b33e91ee4ca368e35a78e0613c720600b3`. For the former, default package
+store paths were also checked against a locally evaluated minimal NixOS system.
+The separate user-supplied `baseline` command still reports name-only hints and
+does not automatically omit packages.

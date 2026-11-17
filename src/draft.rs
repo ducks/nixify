@@ -199,9 +199,71 @@ pub fn expected_attributes(
         Err(error) => return Err(format!("cannot inspect package decisions: {error}")),
     };
     if let Some(entries) = &snapshot {
+        if entries.iter().any(|d| d.covered_by.is_some()) {
+            let read_module = |name: &str| -> Result<String, String> {
+                let path = dir.join(name);
+                let metadata = fs::symlink_metadata(&path)
+                    .map_err(|e| format!("cannot inspect {name}: {e}"))?;
+                if !metadata.file_type().is_file() || metadata.len() > 1024 * 1024 {
+                    return Err(format!(
+                        "{name} must be a regular non-symlink file under 1 MiB"
+                    ));
+                }
+                fs::read_to_string(path).map_err(|e| format!("cannot read {name}: {e}"))
+            };
+            if read_module("configuration.nix")? != configuration() {
+                return Err("configuration.nix was edited; omitted packages need review".into());
+            }
+            let desktop_text = read_module("desktop.nix")?;
+            let selected = [
+                None,
+                Some(crate::desktop::DesktopKind::Hyprland),
+                Some(crate::desktop::DesktopKind::Xfce),
+            ]
+            .into_iter()
+            .find(|selected| {
+                desktop_text == crate::output::desktop_nix_with_selection(inventory, *selected)
+            })
+            .ok_or("desktop.nix was edited; omitted packages need review")?;
+            let mut checked = entries.clone();
+            crate::coverage::apply(inventory, &mut checked, &revision, selected);
+            if entries
+                .iter()
+                .zip(&checked)
+                .any(|(actual, expected)| actual.covered_by != expected.covered_by)
+            {
+                return Err(
+                    "package coverage evidence does not match the inventory or target revision"
+                        .into(),
+                );
+            }
+            {
+                let inspection_path = dir.join("configuration-inspections.json");
+                let inspections: Vec<crate::config_inspection::Inspection> = match fs::symlink_metadata(&inspection_path) {
+                    Ok(metadata) if metadata.file_type().is_file() && metadata.len() <= 1024 * 1024 => {
+                        let bytes = fs::read(&inspection_path).map_err(|e| format!("cannot read inspections: {e}"))?;
+                        let values: Vec<crate::config_inspection::Inspection> = serde_json::from_slice(&bytes).map_err(|e| format!("invalid inspections: {e}"))?;
+                        for value in &values { value.validate()?; }
+                        values
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+                    _ => return Err("configuration-inspections.json must be a regular non-symlink file under 1 MiB".into()),
+                };
+                let expected = crate::output::services_nix_with_inspections(
+                    &crate::service_mapping::decisions(inventory),
+                    &inspections,
+                );
+                if read_module("services.nix")? != expected {
+                    return Err(
+                        "services.nix was edited; omitted service packages need review".into(),
+                    );
+                }
+            }
+        }
         if package_text == crate::output::packages_nix(entries) {
             let attrs = entries
                 .iter()
+                .filter(|d| d.covered_by.is_none())
                 .filter_map(|d| d.nixpkgs_attribute.clone())
                 .collect::<std::collections::BTreeSet<_>>()
                 .into_iter()

@@ -15,6 +15,7 @@ use std::{
 pub fn packages_nix(decisions: &[Decision]) -> String {
     let attrs: BTreeSet<_> = decisions
         .iter()
+        .filter(|d| d.covered_by.is_none())
         .filter_map(|d| d.nixpkgs_attribute.as_deref())
         .collect();
     let mut out = String::from("# Migration draft. Package mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n");
@@ -49,6 +50,27 @@ pub fn services_nix(decisions: &[ServiceDecision]) -> String {
     }
     out.push_str("}\n");
     out
+}
+
+pub(crate) fn services_nix_with_inspections(
+    decisions: &[ServiceDecision],
+    inspections: &[crate::config_inspection::Inspection],
+) -> String {
+    let mut services = services_nix(decisions);
+    if decisions
+        .iter()
+        .any(|d| d.nixos_option == Some("virtualisation.docker.enable"))
+    {
+        for inspection in inspections {
+            for setting in &inspection.settings {
+                if let crate::config_inspection::Setting::DockerLiveRestore(value) = setting {
+                    let setting = format!("  virtualisation.docker.daemon.settings.\"live-restore\" = {value}; # inspected\n");
+                    services.insert_str(services.len() - 2, &setting);
+                }
+            }
+        }
+    }
+    services
 }
 
 pub fn desktop_nix(inventory: &Inventory) -> String {
@@ -101,6 +123,10 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         .filter(|p| p.explicitly_installed)
         .count();
     let mut out = format!("# nixify migration report\n\nSource: Manjaro Linux ({})\n\n## Packages\n\n- Explicitly installed: {explicit}\n- Curated mappings (not revision-validated): {}\n- User-reviewed mappings (not automatically verified): {}\n- Inferred mappings (same name and upstream homepage; review): {}\n- Require review: {}\n- No mapping: {}\n- Dependency-installed, not selected: {}\n\n", inventory.source.architecture, count(Status::Mapped), count(Status::Reviewed), count(Status::Inferred), count(Status::Review), count(Status::Unmapped), count(Status::Dependency));
+    let covered = decisions.iter().filter(|d| d.covered_by.is_some()).count();
+    if covered > 0 {
+        let _ = writeln!(out, "- Direct package entries omitted as already supplied by generated NixOS configuration: {covered}. Review these if you change the providing module or default packages.\n");
+    }
     out.push_str("## Package decisions\n\n");
     for d in decisions.iter().filter(|d| d.status != Status::Dependency) {
         let _ = writeln!(
@@ -113,6 +139,9 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
                 .map(|a| format!(" Proposed attribute: `{a}`."))
                 .unwrap_or_default()
         );
+        if let Some(coverage) = &d.covered_by {
+            let _ = writeln!(out, "  Direct entry omitted: `{}` supplies it at Nixpkgs revision `{}` on x86_64. Recheck if you change the providing configuration; another source mapping may still include the same attribute.", coverage.provider, coverage.nixpkgs_revision);
+        }
     }
     out.push_str("\n## Services\n\n");
     if inventory.service_scopes.is_empty() {
@@ -353,8 +382,9 @@ pub fn generate_with_inspections(
     let flake =
         crate::draft::flake(&inventory.source.architecture, revision).map_err(io::Error::other)?;
     let revision = crate::draft::normalize_revision(revision).map_err(io::Error::other)?;
-    let decisions = mapping::reviewed_decisions(inventory, review, Some(&revision))
+    let mut decisions = mapping::reviewed_decisions(inventory, review, Some(&revision))
         .map_err(io::Error::other)?;
+    crate::coverage::apply(inventory, &mut decisions, &revision, selected);
     // Never overwrite a previous output, including partially generated drafts.
     fs::create_dir(dir)?;
     create_file(&dir.join("flake.nix"), &flake)?;
@@ -368,20 +398,10 @@ pub fn generate_with_inspections(
         &(serde_json::to_string_pretty(&decisions)? + "\n"),
     )?;
     let service_decisions = service_mapping::decisions(inventory);
-    let mut services = services_nix(&service_decisions);
+    let services = services_nix_with_inspections(&service_decisions, inspections);
     let docker_enabled = service_decisions
         .iter()
         .any(|d| d.nixos_option == Some("virtualisation.docker.enable"));
-    if docker_enabled {
-        for inspection in inspections {
-            for setting in &inspection.settings {
-                if let crate::config_inspection::Setting::DockerLiveRestore(value) = setting {
-                    let setting = format!("  virtualisation.docker.daemon.settings.\"live-restore\" = {value}; # inspected\n");
-                    services.insert_str(services.len() - 2, &setting);
-                }
-            }
-        }
-    }
     create_file(&dir.join("services.nix"), &services)?;
     create_file(
         &dir.join("desktop.nix"),
