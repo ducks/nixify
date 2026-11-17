@@ -17,6 +17,14 @@ nixify validate ./nixos-migration
 
 `scan` reads `/etc/os-release`, calls `pacman -Q`, `-Qqe`, and `-Qqm`, and queries system and user systemd scopes for unit-file and running states. It does not alter the package database or systemd configuration. If a systemd scope is inaccessible, its state is explicitly unknown. It collects package names, versions and install reasons. “Explicit” is a pacman database flag, **not a count of packages you personally installed**: an installer or setup tool may have marked packages explicit. “Foreign” means absent from configured sync databases, not necessarily AUR.
 
+The scanner also queries installed package groups using `pacman -Qg`. Reports
+group explicitly installed members for review, including groups unrelated to
+desktops. Groups can overlap, and membership does not prove that the group was
+installed together, is currently used, or should migrate. This is review
+evidence only: the current generator does not apply group-level selections or
+remove packages based on group membership. If the query fails or disagrees
+with the package snapshot, group membership is unknown and a warning is saved.
+
 Generated `packages.nix` includes explicitly installed packages with curated mappings and inferred matches whose source and Nixpkgs catalog entries share a name and upstream homepage. The report labels inferred entries and their limitations, including when a foreign package happens to match AUR. Same-project packages may still differ, and foreign status does not prove AUR provenance. Dependencies are not promoted to direct packages; weak and unmapped matches remain in the report. Target revision, package features, platform support and behavior still need checking. Package mappings do not configure login shells, services, graphical sessions or application data. Output directories and inventory files must not exist already: existing work is never overwritten.
 
 Some mapped packages may be classified as unfree by the selected Nixpkgs

@@ -127,6 +127,47 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
     if covered > 0 {
         let _ = writeln!(out, "- Direct package entries omitted as already supplied by generated NixOS configuration: {covered}. Review these if you change the providing module or default packages.\n");
     }
+    if let Some(groups) = &inventory.package_groups {
+        out.push_str("## Installed package groups\n\nSource: `pacman -Qg`. Groups may overlap; membership does not show who installed a package, whether it is used, or whether the whole group should migrate. Dependencies are not listed here. These are review hints and do not change the generated configuration.\n\n");
+        let mut groups: Vec<_> = groups.iter().collect();
+        groups.sort_by(|a, b| a.name.cmp(&b.name));
+        let by_name: std::collections::BTreeMap<_, _> =
+            decisions.iter().map(|d| (d.package.as_str(), d)).collect();
+        for group in groups {
+            let mut members: Vec<_> = group
+                .packages
+                .iter()
+                .filter_map(|name| by_name.get(name.as_str()).copied())
+                .filter(|d| d.status != Status::Dependency)
+                .collect();
+            members.sort_by(|a, b| a.package.cmp(&b.package));
+            if members.is_empty() {
+                continue;
+            }
+            let proposed = members
+                .iter()
+                .filter(|d| d.nixpkgs_attribute.is_some() && d.covered_by.is_none())
+                .count();
+            let _ = writeln!(
+                out,
+                "### `{}` — {} explicit, {} direct entries proposed\n",
+                group.name,
+                members.len(),
+                proposed
+            );
+            for d in members {
+                let state = if d.covered_by.is_some() {
+                    "provided by target configuration"
+                } else if d.nixpkgs_attribute.is_some() {
+                    "direct entry proposed"
+                } else {
+                    "requires review"
+                };
+                let _ = writeln!(out, "- `{}` — {}", d.package, state);
+            }
+            out.push('\n');
+        }
+    }
     out.push_str("## Package decisions\n\n");
     for d in decisions.iter().filter(|d| d.status != Status::Dependency) {
         let _ = writeln!(
@@ -448,6 +489,12 @@ pub fn generate_with_inspections(
     )?;
     let mut sorted = inventory.clone();
     sorted.packages.sort_by(|a, b| a.name.cmp(&b.name));
+    if let Some(groups) = &mut sorted.package_groups {
+        groups.sort_by(|a, b| a.name.cmp(&b.name));
+        for group in groups {
+            group.packages.sort();
+        }
+    }
     sorted.service_scopes.sort_by_key(|s| s.scope);
     for scope in &mut sorted.service_scopes {
         scope.services.sort_by(|a, b| a.name.cmp(&b.name));

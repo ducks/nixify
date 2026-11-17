@@ -1576,3 +1576,38 @@ fn coverage_does_not_override_review_foreign_or_runtime_only_services() {
         .covered_by
         .is_some());
 }
+
+#[test]
+fn package_groups_are_generic_review_hints_not_install_decisions() {
+    let mut inventory = fixture();
+    let groups = nixify::package_groups::parse(
+        "development git\nshared neovim\ndevelopment neovim\n",
+        &inventory,
+    )
+    .unwrap();
+    assert_eq!(groups.len(), 2);
+    inventory.package_groups = Some(groups);
+    inventory.validate().unwrap();
+    let decisions = mapping::decisions(&inventory);
+    let before = output::packages_nix(&decisions);
+    let report = output::report(&inventory, &decisions);
+    assert!(report.contains("### `development` — 2 explicit"));
+    assert!(report.contains("Groups may overlap"));
+    assert!(report.contains("do not change the generated configuration"));
+    assert_eq!(
+        before,
+        output::packages_nix(&mapping::decisions(&inventory))
+    );
+    assert!(nixify::package_groups::parse("development no-such-package\n", &inventory).is_err());
+    assert!(
+        nixify::package_groups::parse("development git\ndevelopment git\n", &inventory).is_err()
+    );
+    assert!(nixify::package_groups::parse("bad;group git\n", &inventory).is_err());
+    assert!(nixify::package_groups::parse("development git extra\n", &inventory).is_err());
+    let mut old = serde_json::to_value(&inventory).unwrap();
+    old.as_object_mut().unwrap().remove("package_groups");
+    assert!(serde_json::from_value::<Inventory>(old)
+        .unwrap()
+        .package_groups
+        .is_none());
+}

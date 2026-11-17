@@ -6,6 +6,9 @@ pub struct Inventory {
     pub schema_version: u32,
     pub source: Source,
     pub packages: Vec<Package>,
+    /// Installed package group membership, when the package manager exposed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_groups: Option<Vec<PackageGroup>>,
     #[serde(default)]
     pub service_scopes: Vec<ServiceScope>,
     #[serde(default)]
@@ -33,6 +36,12 @@ pub struct Package {
     pub explicitly_installed: bool,
     pub foreign: bool,
     pub evidence: Vec<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PackageGroup {
+    pub name: String,
+    pub packages: Vec<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -97,6 +106,22 @@ impl Inventory {
             }
             if !seen.insert(&package.name) {
                 return Err(format!("duplicate package: {}", package.name));
+            }
+        }
+        if let Some(groups) = &self.package_groups {
+            let mut group_names = std::collections::BTreeSet::new();
+            for group in groups {
+                let mut members = std::collections::BTreeSet::new();
+                if !valid_package_name(&group.name)
+                    || !group_names.insert(&group.name)
+                    || group.packages.is_empty()
+                    || group
+                        .packages
+                        .iter()
+                        .any(|name| !seen.contains(name) || !members.insert(name))
+                {
+                    return Err("invalid or inconsistent installed package group".into());
+                }
             }
         }
         let mut scopes = std::collections::BTreeSet::new();
