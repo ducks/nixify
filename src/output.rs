@@ -181,7 +181,7 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
                 .unwrap_or_default()
         );
         if let Some(coverage) = &d.covered_by {
-            let _ = writeln!(out, "  Direct entry omitted: `{}` supplies it at Nixpkgs revision `{}` on x86_64. Recheck if you change the providing configuration; another source mapping may still include the same attribute.", coverage.provider, coverage.nixpkgs_revision);
+            let _ = writeln!(out, "  Direct entry omitted: `{}` supplies it at Nixpkgs revision `{}`. Recheck if you change the providing configuration; another source mapping may still include the same attribute.", coverage.provider, coverage.nixpkgs_revision);
         }
     }
     out.push_str("\n## Services\n\n");
@@ -407,6 +407,26 @@ pub fn generate_with_inspections(
     selected: Option<desktop::DesktopKind>,
     inspections: &[crate::config_inspection::Inspection],
 ) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_coverage(
+        inventory,
+        dir,
+        revision,
+        review,
+        selected,
+        inspections,
+        None,
+    )
+}
+
+pub fn generate_with_coverage(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+    selected: Option<desktop::DesktopKind>,
+    inspections: &[crate::config_inspection::Inspection],
+    evaluated: Option<&crate::coverage_eval::Evidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
     inventory.validate().map_err(io::Error::other)?;
     for (index, inspection) in inspections.iter().enumerate() {
         inspection.validate().map_err(io::Error::other)?;
@@ -426,6 +446,14 @@ pub fn generate_with_inspections(
     let mut decisions = mapping::reviewed_decisions(inventory, review, Some(&revision))
         .map_err(io::Error::other)?;
     crate::coverage::apply(inventory, &mut decisions, &revision, selected);
+    if let Some(evidence) = evaluated {
+        // Evaluated signatures supersede the assumptions in offline rules.
+        for decision in &mut decisions {
+            decision.covered_by = None;
+        }
+        crate::coverage_eval::apply(inventory, &mut decisions, evidence, &revision)
+            .map_err(io::Error::other)?;
+    }
     // Never overwrite a previous output, including partially generated drafts.
     fs::create_dir(dir)?;
     create_file(&dir.join("flake.nix"), &flake)?;
@@ -438,6 +466,12 @@ pub fn generate_with_inspections(
         &dir.join("package-decisions.json"),
         &(serde_json::to_string_pretty(&decisions)? + "\n"),
     )?;
+    if let Some(evidence) = evaluated {
+        create_file(
+            &dir.join("coverage-evaluation.json"),
+            &(serde_json::to_string_pretty(evidence)? + "\n"),
+        )?;
+    }
     let service_decisions = service_mapping::decisions(inventory);
     let services = services_nix_with_inspections(&service_decisions, inspections);
     let docker_enabled = service_decisions
@@ -459,6 +493,9 @@ pub fn generate_with_inspections(
         )?;
     }
     let mut inspection_report = String::new();
+    if let Some(evidence) = evaluated {
+        let _ = writeln!(inspection_report, "\n## Evaluated target coverage\n\n- Compared {} attributes with generated target system package outputs on {}.\n- {} attributes matched; {} candidates and {} system packages could not be evaluated. Unmatched or unavailable entries remain subject to normal mapping rules.\n- Checkout revision metadata is self-reported, and this is an evaluation with placeholder hardware, not a build or proof of behavioral equivalence. The saved evidence is not authenticated.\n", evidence.candidate_count, evidence.system, evidence.matched.len(), evidence.unavailable_candidates, evidence.unavailable_system_packages);
+    }
     if !inspections.is_empty() {
         inspection_report.push_str("\n## Explicit configuration inspections\n\nOnly allowlisted settings are retained. Other content was omitted; inspect the original files before migration. Hyprland findings are review-only and not applied.\n\n");
         for inspection in inspections {

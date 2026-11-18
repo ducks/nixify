@@ -3,6 +3,7 @@ pub mod catalog;
 pub mod config_evidence;
 pub mod config_inspection;
 pub mod coverage;
+pub mod coverage_eval;
 pub mod desktop;
 pub mod draft;
 pub mod hardware;

@@ -70,6 +70,9 @@ enum Command {
         /// Full pinned Nixpkgs Git revision (defaults to nixify's locked revision).
         #[arg(long)]
         nixpkgs_rev: Option<String>,
+        /// Evaluate a trusted local checkout matching the target revision for exact package overlap.
+        #[arg(long)]
+        nixpkgs: Option<PathBuf>,
         /// Explicitly reviewed mappings in JSON; never inferred automatically.
         #[arg(long)]
         reviewed_mappings: Option<PathBuf>,
@@ -226,6 +229,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             input,
             output: dir,
             nixpkgs_rev,
+            nixpkgs,
             reviewed_mappings,
             desktop,
             config_inspection: inspection_paths,
@@ -247,13 +251,35 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 inspection.validate().map_err(std::io::Error::other)?;
                 inspections.push(inspection);
             }
-            output::generate_with_inspections(
+            let selected = desktop.map(Into::into);
+            let revision = draft::normalize_revision(&revision).map_err(std::io::Error::other)?;
+            let evidence = if let Some(checkout) = nixpkgs {
+                if dir.try_exists()? {
+                    return Err(format!("output already exists: {}", dir.display()).into());
+                }
+                eprintln!("Evaluating trusted Nixpkgs checkout for target package overlap...");
+                Some(
+                    nixify::coverage_eval::evaluate(
+                        &inventory,
+                        &revision,
+                        &reviewed,
+                        selected,
+                        &inspections,
+                        &checkout,
+                    )
+                    .map_err(std::io::Error::other)?,
+                )
+            } else {
+                None
+            };
+            output::generate_with_coverage(
                 &inventory,
                 &dir,
                 &revision,
                 &reviewed,
-                desktop.map(Into::into),
+                selected,
                 &inspections,
+                evidence.as_ref(),
             )?;
             eprintln!("Wrote migration draft to {}", dir.display());
         }

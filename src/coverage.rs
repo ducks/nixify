@@ -54,12 +54,6 @@ pub fn apply(
             continue;
         }
         let provider = match decision.package.as_str() {
-            // These are in requiredPackages/corePackageNames or the defaultPackages
-            // list in nixos/modules/config/system-path.nix at both revisions.
-            "bzip2" | "diffutils" | "findutils" | "gawk" | "gzip" | "less" | "which" => {
-                Some("NixOS required system packages")
-            }
-            "perl" | "rsync" => Some("NixOS default system packages"),
             "networkmanager"
                 if services
                     .iter()
@@ -74,7 +68,9 @@ pub fn apply(
             {
                 Some("virtualisation.docker.enable")
             }
-            "hyprland" if desktop == Some(DesktopKind::Hyprland) => {
+            "hyprland"
+                if desktop == Some(DesktopKind::Hyprland) && revision == VERIFIED_REVISIONS[0] =>
+            {
                 Some("programs.hyprland.enable")
             }
             _ => None,

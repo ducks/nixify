@@ -22,8 +22,9 @@ Optional `hardware-config` invokes the existing NixOS generator with `--show-har
 # Revision-scoped package coverage
 
 Offline generation recognizes a deliberately small set of direct entries
-provided by the default NixOS system path or by explicitly generated Docker,
-NetworkManager, and Hyprland modules. Rules require an exact source name and
+provided by explicitly generated Docker, NetworkManager, and Hyprland modules.
+Base-system entries remain direct because their link priorities can differ.
+Rules require an exact source name and
 target attribute, an x86_64 target, and one of two checked revisions. Foreign
 packages and user-reviewed mappings take precedence and remain direct entries.
 Coverage is stored alongside each package decision and explained in the report.
@@ -36,7 +37,19 @@ The checked sources are `nixos/modules/config/system-path.nix`,
 `nixos/modules/services/networking/networkmanager.nix`, and
 `nixos/modules/programs/wayland/hyprland.nix` in Nixpkgs revisions
 `eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a` and
-`9fbb54b33e91ee4ca368e35a78e0613c720600b3`. For the former, default package
-store paths were also checked against a locally evaluated minimal NixOS system.
+`9fbb54b33e91ee4ca368e35a78e0613c720600b3`. Hyprland is covered offline only
+at the first revision; its newer module transforms the package.
 The separate user-supplied `baseline` command still reports name-only hints and
 does not automatically omit packages.
+
+With explicit `generate --nixpkgs`, nixify creates a private temporary copy of
+the generated modules with an empty packages module and evaluates it against a
+trusted checkout. It compares candidate `outPath`, installed outputs, and link priority with evaluable
+`environment.systemPackages` entries, using temporary hardware placeholders.
+Only positive exact matches can be marked covered; foreign and user-reviewed
+entries stay direct. It records matched paths, installed outputs, link priorities,
+and incomplete-evaluation counts in
+`coverage-evaluation.json`. The checkout must self-report the target revision;
+neither that metadata nor the saved evidence is authenticated. Validation
+checks the evidence structure and generated modules but does not repeat the
+Nix evaluation. This is not a closure comparison or a build.

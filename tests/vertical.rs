@@ -1457,11 +1457,12 @@ fn verified_coverage_is_default_revision_scoped_and_auditable() {
     let packages = fs::read_to_string(dest.join("packages.nix")).unwrap();
     let decisions: Vec<mapping::Decision> =
         serde_json::from_slice(&fs::read(dest.join("package-decisions.json")).unwrap()).unwrap();
-    for name in ["bzip2", "docker", "hyprland", "networkmanager"] {
+    for name in ["docker", "hyprland", "networkmanager"] {
         let decision = decisions.iter().find(|d| d.package == name).unwrap();
         assert!(decision.covered_by.is_some(), "{name}: {decision:?}");
         assert!(!packages.contains(&format!("pkgs.\"{name}\"")));
     }
+    assert!(packages.contains("pkgs.\"bzip2\""));
     assert!(packages.contains("pkgs.\"firefox\""));
     let report = fs::read_to_string(dest.join("migration-report.md")).unwrap();
     assert!(report.contains("Direct package entries omitted"));
@@ -1469,6 +1470,28 @@ fn verified_coverage_is_default_revision_scoped_and_auditable() {
     let (_, attrs) = draft::expected_attributes(&dest, &inventory).unwrap();
     assert!(attrs.contains(&"firefox".to_owned()));
     assert!(!attrs.contains(&"docker".to_owned()));
+    let mut stale = decisions.clone();
+    stale
+        .iter_mut()
+        .find(|d| d.package == "bzip2")
+        .unwrap()
+        .covered_by = Some(nixify::coverage::Coverage {
+        provider: "NixOS required system packages".into(),
+        nixpkgs_revision: revision.into(),
+    });
+    fs::write(dest.join("packages.nix"), output::packages_nix(&stale)).unwrap();
+    fs::write(
+        dest.join("package-decisions.json"),
+        serde_json::to_vec(&stale).unwrap(),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&dest, &inventory).is_err());
+    fs::write(dest.join("packages.nix"), &packages).unwrap();
+    fs::write(
+        dest.join("package-decisions.json"),
+        serde_json::to_vec(&decisions).unwrap(),
+    )
+    .unwrap();
     let services = fs::read_to_string(dest.join("services.nix")).unwrap();
     fs::write(
         dest.join("services.nix"),
@@ -1562,7 +1585,7 @@ fn coverage_does_not_override_review_foreign_or_runtime_only_services() {
             "{name}"
         );
     }
-    // Explicit desktop selection only applies when the target revision is verified.
+    // The newer revision's Hyprland override is not verified offline.
     nixify::coverage::apply(
         &inventory,
         &mut decisions,
@@ -1574,7 +1597,7 @@ fn coverage_does_not_override_review_foreign_or_runtime_only_services() {
         .find(|d| d.package == "hyprland")
         .unwrap()
         .covered_by
-        .is_some());
+        .is_none());
 }
 
 #[test]
@@ -1610,4 +1633,238 @@ fn package_groups_are_generic_review_hints_not_install_decisions() {
         .unwrap()
         .package_groups
         .is_none());
+}
+
+#[test]
+fn target_coverage_compares_generated_modules_and_persists_reviewable_evidence() {
+    use nixify::{coverage_eval, draft};
+    use std::collections::BTreeMap;
+    let inventory = fixture();
+    let root = tempfile::tempdir().unwrap();
+    let checkout = root.path().join("checkout");
+    fs::create_dir(&checkout).unwrap();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    fs::write(checkout.join(".git-revision"), revision).unwrap();
+    let evidence = coverage_eval::evaluate_with(&inventory, revision, &mapping::ReviewedMappings::empty(), None, &[], &checkout, |args| {
+        let argument = |name: &str| -> &str {
+            let index = args.windows(2).position(|x| x == ["--argstr", name]).unwrap();
+            args[index + 2]
+        };
+        let project = std::path::Path::new(argument("projectPath"));
+        assert_eq!(fs::read_to_string(project.join("packages.nix")).unwrap(), output::packages_nix(&[]));
+        let attrs: Vec<String> = serde_json::from_slice(&fs::read(argument("attributesPath")).unwrap()).unwrap();
+        let results: BTreeMap<_, _> = attrs.into_iter().map(|name| {
+            let result = if name == "git" {
+                serde_json::json!({"state":"matched", "evidence":{"path":"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-git", "outputs":["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-git"], "priority":5}})
+            } else {
+                serde_json::json!({"state":"unavailable", "evidence":null})
+            };
+            (name, result)
+        }).collect();
+        Ok(serde_json::json!({"results":results,"unavailable_system_packages":1,"failed_assertions":[]}).to_string())
+    }).unwrap();
+    assert_eq!(evidence.matched.len(), 1);
+    assert!(evidence.unavailable_candidates > 0);
+    let dir = root.path().join("draft");
+    output::generate_with_coverage(
+        &inventory,
+        &dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        Some(&evidence),
+    )
+    .unwrap();
+    assert!(!fs::read_to_string(dir.join("packages.nix"))
+        .unwrap()
+        .contains("pkgs.\"git\""));
+    assert!(fs::read_to_string(dir.join("migration-report.md"))
+        .unwrap()
+        .contains("evaluated target system packages"));
+    let (_, attrs) = draft::expected_attributes(&dir, &inventory).unwrap();
+    assert!(!attrs.contains(&"git".to_string()));
+    fs::remove_file(dir.join("coverage-evaluation.json")).unwrap();
+    assert!(draft::expected_attributes(&dir, &inventory).is_err());
+    let mut empty = evidence.clone();
+    empty.matched.clear();
+    let empty_dir = root.path().join("empty-matches");
+    output::generate_with_coverage(
+        &inventory,
+        &empty_dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        Some(&empty),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&empty_dir, &inventory).is_ok());
+    empty.schema_version = 99;
+    fs::write(
+        empty_dir.join("coverage-evaluation.json"),
+        serde_json::to_vec(&empty).unwrap(),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&empty_dir, &inventory).is_err());
+}
+
+#[test]
+fn target_coverage_refuses_wrong_revision_and_incomplete_results() {
+    use nixify::coverage_eval;
+    let inventory = fixture();
+    let root = tempfile::tempdir().unwrap();
+    fs::write(
+        root.path().join(".git-revision"),
+        "ffffffffffffffffffffffffffffffffffffffff",
+    )
+    .unwrap();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    assert!(coverage_eval::evaluate_with(
+        &inventory,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        root.path(),
+        |_| panic!("must not evaluate mismatched checkout")
+    )
+    .unwrap_err()
+    .contains("does not match"));
+    fs::write(root.path().join(".git-revision"), revision).unwrap();
+    let error = coverage_eval::evaluate_with(
+        &inventory,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        root.path(),
+        |_| {
+            Ok(
+                r#"{"results":{},"unavailable_system_packages":0,"failed_assertions":[]}"#
+                    .to_owned(),
+            )
+        },
+    )
+    .unwrap_err();
+    assert!(error.contains("incomplete"));
+}
+
+#[test]
+fn evaluated_coverage_keeps_foreign_and_explicitly_reviewed_packages() {
+    use nixify::coverage_eval::{self, Evidence, MatchEvidence};
+    let mut inventory = fixture();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    let review = mapping::ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: None,
+        mappings: vec![mapping::ReviewedMapping {
+            source_package: "git".into(),
+            nixpkgs_attribute: "git".into(),
+        }],
+    };
+    let mut decisions = mapping::reviewed_decisions(&inventory, &review, Some(revision)).unwrap();
+    let count = decisions
+        .iter()
+        .filter_map(|d| d.nixpkgs_attribute.as_ref())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let evidence = Evidence {
+        schema_version: 1,
+        nixpkgs_revision: revision.into(),
+        system: "x86_64-linux".into(),
+        matched: [(
+            "git".into(),
+            MatchEvidence {
+                path: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-git".into(),
+                outputs: vec!["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-git".into()],
+                priority: 5,
+            },
+        )]
+        .into_iter()
+        .collect(),
+        candidate_count: count,
+        unavailable_candidates: 0,
+        unavailable_system_packages: 0,
+    };
+    coverage_eval::apply(&inventory, &mut decisions, &evidence, revision).unwrap();
+    assert!(decisions
+        .iter()
+        .find(|d| d.package == "git")
+        .unwrap()
+        .covered_by
+        .is_none());
+    let mut decisions = mapping::decisions(&inventory);
+    inventory
+        .packages
+        .iter_mut()
+        .find(|p| p.name == "git")
+        .unwrap()
+        .foreign = true;
+    coverage_eval::apply(&inventory, &mut decisions, &evidence, revision).unwrap();
+    assert!(decisions
+        .iter()
+        .find(|d| d.package == "git")
+        .unwrap()
+        .covered_by
+        .is_none());
+}
+
+#[test]
+#[ignore = "requires nix-instantiate; run explicitly for target coverage integration"]
+fn nix_target_coverage_respects_outputs_and_link_priority() {
+    use nixify::coverage_eval;
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "git 1\nneovim 1\nbzip2 1\n",
+        "git\nneovim\nbzip2\n",
+        "",
+    )
+    .unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let checkout = root.path().join("nixpkgs");
+    fs::create_dir_all(checkout.join("nixos/lib")).unwrap();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    fs::write(checkout.join(".git-revision"), revision).unwrap();
+    fs::write(checkout.join("nixos/lib/eval-config.nix"), r#"
+{ system, modules }:
+let
+  mk = name: priority: outputs:
+    let path = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-" + name;
+    in { outPath = path; out.outPath = path; bin.outPath = path + "-bin"; meta = { inherit priority; outputsToInstall = outputs; }; };
+  git = mk "git" 5 [ "out" ];
+  neovim = mk "neovim" 5 [ "out" ];
+  bzip2 = mk "bzip2" 5 [ "out" "bin" ];
+  lib = {
+    splitString = separator: value: [ value ];
+    attrByPath = parts: fallback: attrs: if builtins.hasAttr (builtins.head parts) attrs then attrs.${builtins.head parts} else fallback;
+    meta.defaultPriority = 5;
+  };
+in {
+  pkgs = { inherit lib git neovim bzip2; };
+  config = {
+    environment = { systemPackages = [ git (mk "neovim" 8 [ "out" ]) (mk "bzip2" 5 [ "out" ]) ]; extraOutputsToInstall = []; };
+    assertions = [];
+  };
+}
+"#).unwrap();
+    let evidence = coverage_eval::evaluate(
+        &inventory,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        &checkout,
+    )
+    .unwrap();
+    assert_eq!(
+        evidence
+            .matched
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["git"]
+    );
+    assert_eq!(evidence.unavailable_candidates, 0);
 }

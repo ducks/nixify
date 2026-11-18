@@ -32,10 +32,11 @@ revision. Attribute-existence and partial module checks do not guarantee a
 system build will evaluate successfully. Review package licenses and configure
 your own Nixpkgs policy where needed; nixify does not enable unfree packages.
 
-For two explicitly checked Nixpkgs revisions on x86_64, generation omits a
-small set of direct package entries already supplied by the NixOS base system
-or by generated Docker, NetworkManager, and explicitly selected Hyprland
-modules. Each omission and its provider appear in `migration-report.md` and
+For two explicitly checked Nixpkgs revisions on x86_64, generation omits
+Docker and NetworkManager direct entries when their generated modules supply
+them. The checked 24.11 revision also supports this for explicitly selected
+Hyprland. Base-system entries are kept offline: some share a store path but
+have a different link priority. Each omission and its provider appear in `migration-report.md` and
 `package-decisions.json`. This does not prove the source and target software
 behave identically. If you disable a providing module, override its package,
 or change NixOS default packages, review the affected entries and add them
@@ -43,10 +44,38 @@ back if needed. Foreign packages and explicit `--reviewed-mappings` overrides
 are never omitted by these rules. Other revisions and architectures keep the
 direct entries; no Nix installation or network access is required to generate.
 The initial rules remove only a small fraction of distribution-provided
-packages; the rest still need review. For drafts with omissions, the optional
+packages; the rest still need review. Older drafts that omitted base packages
+under the previous offline rules must be regenerated for attribute validation.
+For drafts with omissions, the optional
 attribute check also requires the generated configuration, service, and desktop
 modules to remain unchanged; if they were edited, it stops and asks for review.
 Syntax validation remains available for edited drafts.
+
+To detect additional packages supplied by the actual generated base, service,
+and desktop modules, opt in to evaluating a **trusted** local checkout matching
+the target revision:
+
+```sh
+nixify generate --input inventory.json --output ./nixos-migration \
+  --nixpkgs-rev <full-commit> --nixpkgs /path/to/nixpkgs --desktop hyprland
+```
+
+This evaluates a temporary copy of the generated modules with an empty package
+list and placeholder hardware, then compares Nix output store paths, installed
+outputs, and link priorities for proposed attributes against
+`environment.systemPackages`. It does not build or
+activate anything. Matches are saved in `coverage-evaluation.json` and the
+report; packages whose identities cannot be evaluated remain subject to the
+ordinary offline rules. Foreign packages and user-reviewed mappings are kept.
+Evaluated matches replace the bundled offline overlap rules for that draft. The
+checkout's `.git-revision` must match the target pin, but that file and the
+saved evidence are self-reported and are not proof of checkout contents. Nix
+evaluation can execute code from the checkout and access local files, so only
+use a checkout you trust. Changing providers, Nixpkgs configuration, package
+overrides, or target modules requires re-evaluation. Attribute validation checks
+that saved evidence is consistent with the generated files; it does not rerun
+the comparison or authenticate the evidence. This does not prove source-package
+equivalence or cover every dependency in the target closure.
 
 `services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. The allowlist includes Bluetooth, printing, Avahi, libvirt, TLP, Ollama and Mullvad. On the checked Nixpkgs revision, Mullvad changes reverse-path firewall checking to loose; review target-specific effects before use. Service names and status are included in the inventory and may reveal sensitive information.
 
@@ -212,6 +241,7 @@ Inventories disclose installed package names, versions, origin flags, architectu
 
 ```sh
 cargo test --locked
+cargo test --locked nix_target_coverage_respects_outputs_and_link_priority -- --ignored # requires nix-instantiate
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
 nix develop

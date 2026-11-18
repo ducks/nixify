@@ -199,7 +199,12 @@ pub fn expected_attributes(
         Err(error) => return Err(format!("cannot inspect package decisions: {error}")),
     };
     if let Some(entries) = &snapshot {
-        if entries.iter().any(|d| d.covered_by.is_some()) {
+        let has_evidence = match fs::symlink_metadata(dir.join("coverage-evaluation.json")) {
+            Ok(_) => true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => return Err(format!("cannot inspect evaluated coverage: {error}")),
+        };
+        if has_evidence || entries.iter().any(|d| d.covered_by.is_some()) {
             let read_module = |name: &str| -> Result<String, String> {
                 let path = dir.join(name);
                 let metadata = fs::symlink_metadata(&path)
@@ -227,6 +232,27 @@ pub fn expected_attributes(
             .ok_or("desktop.nix was edited; omitted packages need review")?;
             let mut checked = entries.clone();
             crate::coverage::apply(inventory, &mut checked, &revision, selected);
+            let evidence_path = dir.join("coverage-evaluation.json");
+            match fs::symlink_metadata(&evidence_path) {
+                Ok(meta) if meta.file_type().is_file() && meta.len() <= 4 * 1024 * 1024 => {
+                    let bytes = fs::read(&evidence_path)
+                        .map_err(|e| format!("cannot read evaluated coverage: {e}"))?;
+                    let evidence: crate::coverage_eval::Evidence =
+                        serde_json::from_slice(&bytes)
+                            .map_err(|e| format!("invalid evaluated coverage: {e}"))?;
+                    for decision in &mut checked {
+                        decision.covered_by = None;
+                    }
+                    crate::coverage_eval::apply(inventory, &mut checked, &evidence, &revision)?;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                _ => {
+                    return Err(
+                        "coverage-evaluation.json must be a regular non-symlink file under 4 MiB"
+                            .into(),
+                    )
+                }
+            }
             if entries
                 .iter()
                 .zip(&checked)
