@@ -15,7 +15,7 @@ use std::{
 pub fn packages_nix(decisions: &[Decision]) -> String {
     let attrs: BTreeSet<_> = decisions
         .iter()
-        .filter(|d| d.covered_by.is_none())
+        .filter(|d| d.covered_by.is_none() && !d.excluded_by_selection)
         .filter_map(|d| d.nixpkgs_attribute.as_deref())
         .collect();
     let mut out = String::from("# Migration draft. Package mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n");
@@ -127,6 +127,10 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
     if covered > 0 {
         let _ = writeln!(out, "- Direct package entries omitted as already supplied by generated NixOS configuration: {covered}. Review these if you change the providing module or default packages.\n");
     }
+    let excluded = decisions.iter().filter(|d| d.excluded_by_selection).count();
+    if excluded > 0 {
+        let _ = writeln!(out, "- Source packages explicitly excluded from direct entries: {excluded}. Other packages or enabled modules may still provide them.\n");
+    }
     if let Some(groups) = &inventory.package_groups {
         out.push_str("## Installed package groups\n\nSource: `pacman -Qg`. Groups may overlap; membership does not show who installed a package, whether it is used, or whether the whole group should migrate. Dependencies are not listed here. These are review hints and do not change the generated configuration.\n\n");
         let mut groups: Vec<_> = groups.iter().collect();
@@ -146,7 +150,11 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
             }
             let proposed = members
                 .iter()
-                .filter(|d| d.nixpkgs_attribute.is_some() && d.covered_by.is_none())
+                .filter(|d| {
+                    d.nixpkgs_attribute.is_some()
+                        && d.covered_by.is_none()
+                        && !d.excluded_by_selection
+                })
                 .count();
             let _ = writeln!(
                 out,
@@ -156,7 +164,9 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
                 proposed
             );
             for d in members {
-                let state = if d.covered_by.is_some() {
+                let state = if d.excluded_by_selection {
+                    "direct entry excluded by user selection"
+                } else if d.covered_by.is_some() {
                     "provided by target configuration"
                 } else if d.nixpkgs_attribute.is_some() {
                     "direct entry proposed"
@@ -182,6 +192,9 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         );
         if let Some(coverage) = &d.covered_by {
             let _ = writeln!(out, "  Direct entry omitted: `{}` supplies it at Nixpkgs revision `{}`. Recheck if you change the providing configuration; another source mapping may still include the same attribute.", coverage.provider, coverage.nixpkgs_revision);
+        }
+        if d.excluded_by_selection {
+            out.push_str("  Direct entry excluded by explicit selection. Another package or enabled module may still provide it.\n");
         }
     }
     out.push_str("\n## Services\n\n");
@@ -427,6 +440,29 @@ pub fn generate_with_coverage(
     inspections: &[crate::config_inspection::Inspection],
     evaluated: Option<&crate::coverage_eval::Evidence>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_selection(
+        inventory,
+        dir,
+        revision,
+        review,
+        selected,
+        inspections,
+        evaluated,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn generate_with_selection(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+    selected: Option<desktop::DesktopKind>,
+    inspections: &[crate::config_inspection::Inspection],
+    evaluated: Option<&crate::coverage_eval::Evidence>,
+    selection: Option<&crate::selection::Selection>,
+) -> Result<(), Box<dyn std::error::Error>> {
     inventory.validate().map_err(io::Error::other)?;
     for (index, inspection) in inspections.iter().enumerate() {
         inspection.validate().map_err(io::Error::other)?;
@@ -454,6 +490,9 @@ pub fn generate_with_coverage(
         crate::coverage_eval::apply(inventory, &mut decisions, evidence, &revision)
             .map_err(io::Error::other)?;
     }
+    if let Some(selection) = selection {
+        crate::selection::apply(selection, inventory, &mut decisions).map_err(io::Error::other)?;
+    }
     // Never overwrite a previous output, including partially generated drafts.
     fs::create_dir(dir)?;
     create_file(&dir.join("flake.nix"), &flake)?;
@@ -470,6 +509,12 @@ pub fn generate_with_coverage(
         create_file(
             &dir.join("coverage-evaluation.json"),
             &(serde_json::to_string_pretty(evidence)? + "\n"),
+        )?;
+    }
+    if let Some(selection) = selection {
+        create_file(
+            &dir.join("package-selection.json"),
+            &(serde_json::to_string_pretty(selection)? + "\n"),
         )?;
     }
     let service_decisions = service_mapping::decisions(inventory);

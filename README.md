@@ -25,6 +25,35 @@ evidence only: the current generator does not apply group-level selections or
 remove packages based on group membership. If the query fails or disagrees
 with the package snapshot, group membership is unknown and a warning is saved.
 
+### Review application choices
+
+To review a small set of ambiguous application roles before generation:
+
+```sh
+nixify review --input inventory.json --output package-selection.json
+nixify generate --input inventory.json --output ./nixos-migration \
+  --selection package-selection.json
+```
+
+The review groups known, explicitly installed browsers, code editors, terminal
+emulators, and file managers only when more than one is present. It uses a
+small curated list of Manjaro package names, not process history or desktop
+metadata. All options start selected: press Enter to keep all, enter numbers
+such as `1,2` to keep several, or enter `none` to exclude the group from direct
+package entries. Unrecognized and unambiguous packages are unchanged. This
+does not infer which programs you use and does not remove packages from the
+source machine. An excluded package may still be supplied by another package
+or an enabled NixOS module.
+
+The selection is saved separately and copied into the draft; the report lists
+explicitly excluded source packages. It is tied to the inventory's recognized
+review groups: if the inventory changes, run review again. For noninteractive
+use, `nixify review --input inventory.json --output package-selection.json
+--defaults` saves the conservative keep-all selection, which can be inspected
+and edited before generation. Selection files reveal installed software and
+are created with owner-only permissions on Unix. Existing files are never
+overwritten.
+
 Generated `packages.nix` includes explicitly installed packages with curated mappings and inferred matches whose source and Nixpkgs catalog entries share a name and upstream homepage. The report labels inferred entries and their limitations, including when a foreign package happens to match AUR. Same-project packages may still differ, and foreign status does not prove AUR provenance. Dependencies are not promoted to direct packages; weak and unmapped matches remain in the report. Target revision, package features, platform support and behavior still need checking. Package mappings do not configure login shells, services, graphical sessions or application data. Output directories and inventory files must not exist already: existing work is never overwritten.
 
 Some mapped packages may be classified as unfree by the selected Nixpkgs

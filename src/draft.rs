@@ -199,6 +199,26 @@ pub fn expected_attributes(
         Err(error) => return Err(format!("cannot inspect package decisions: {error}")),
     };
     if let Some(entries) = &snapshot {
+        let selection_path = dir.join("package-selection.json");
+        let selection = match fs::symlink_metadata(&selection_path) {
+            Ok(_) => Some(crate::selection::read(&selection_path)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(format!("cannot inspect package selection: {error}")),
+        };
+        let mut selection_check = entries.clone();
+        for decision in &mut selection_check {
+            decision.excluded_by_selection = false;
+        }
+        if let Some(selection) = &selection {
+            crate::selection::apply(selection, inventory, &mut selection_check)?;
+        }
+        if entries
+            .iter()
+            .zip(&selection_check)
+            .any(|(a, b)| a.excluded_by_selection != b.excluded_by_selection)
+        {
+            return Err("package selection does not match generated package decisions".into());
+        }
         let has_evidence = match fs::symlink_metadata(dir.join("coverage-evaluation.json")) {
             Ok(_) => true,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
@@ -289,7 +309,7 @@ pub fn expected_attributes(
         if package_text == crate::output::packages_nix(entries) {
             let attrs = entries
                 .iter()
-                .filter(|d| d.covered_by.is_none())
+                .filter(|d| d.covered_by.is_none() && !d.excluded_by_selection)
                 .filter_map(|d| d.nixpkgs_attribute.clone())
                 .collect::<std::collections::BTreeSet<_>>()
                 .into_iter()

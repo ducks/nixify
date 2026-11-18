@@ -1868,3 +1868,252 @@ in {
     );
     assert_eq!(evidence.unavailable_candidates, 0);
 }
+
+#[test]
+fn application_review_defaults_to_all_and_applies_explicit_choices() {
+    use nixify::{draft, selection};
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\nneovim 1\nhelix 1\ngit 1\n",
+        "firefox\nchromium\nneovim\nhelix\ngit\n",
+        "",
+    )
+    .unwrap();
+    let mut choices = selection::propose(&inventory);
+    assert_eq!(choices.groups.len(), 2);
+    assert!(choices
+        .groups
+        .iter()
+        .flat_map(|g| &g.packages)
+        .all(|p| p.keep));
+    let mut messages = Vec::new();
+    // Groups are sorted: editors, then browsers. Keep both editors and choose
+    // only the second browser. This is explicit input, not an inferred default.
+    selection::review(
+        &mut choices,
+        &mut std::io::Cursor::new(b"\n2\n"),
+        &mut messages,
+    )
+    .unwrap();
+    let browsers = choices
+        .groups
+        .iter()
+        .find(|g| g.role == "Web browsers")
+        .unwrap();
+    assert_eq!(browsers.packages.iter().filter(|p| p.keep).count(), 1);
+    assert_eq!(
+        browsers.packages.iter().find(|p| p.keep).unwrap().package,
+        "firefox"
+    );
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    output::generate_with_selection(
+        &inventory,
+        &dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        None,
+        Some(&choices),
+    )
+    .unwrap();
+    let packages = fs::read_to_string(dir.join("packages.nix")).unwrap();
+    assert!(!packages.contains("pkgs.\"chromium\""));
+    assert!(packages.contains("pkgs.\"firefox\""));
+    assert!(packages.contains("pkgs.\"git\""));
+    assert!(fs::read_to_string(dir.join("migration-report.md"))
+        .unwrap()
+        .contains("Direct entry excluded by explicit selection"));
+    let (_, attrs) = draft::expected_attributes(&dir, &inventory).unwrap();
+    assert!(!attrs.contains(&"chromium".to_string()));
+    fs::remove_file(dir.join("package-selection.json")).unwrap();
+    assert!(draft::expected_attributes(&dir, &inventory).is_err());
+}
+
+#[test]
+fn application_review_rejects_stale_or_injected_choices_and_handles_none() {
+    use nixify::selection;
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\n",
+        "firefox\nchromium\n",
+        "",
+    )
+    .unwrap();
+    let mut choices = selection::propose(&inventory);
+    selection::review(
+        &mut choices,
+        &mut std::io::Cursor::new(b"not-a-number\nnone\n"),
+        &mut Vec::new(),
+    )
+    .unwrap();
+    assert!(choices.groups[0].packages.iter().all(|p| !p.keep));
+    let mut bad = choices.clone();
+    bad.groups[0].packages[0].package = "not-installed".into();
+    assert!(selection::validate(&bad, &inventory).is_err());
+    bad = choices.clone();
+    bad.groups[0].packages.pop();
+    assert!(selection::validate(&bad, &inventory).is_err());
+    assert!(selection::review(
+        &mut choices,
+        &mut std::io::Cursor::new(b""),
+        &mut Vec::new()
+    )
+    .is_err());
+}
+
+#[test]
+fn review_cli_saves_defaults_and_refuses_overwrite() {
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\n",
+        "firefox\nchromium\n",
+        "",
+    )
+    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("inventory.json");
+    let output_path = dir.path().join("choices.json");
+    fs::write(&input, serde_json::to_vec(&inventory).unwrap()).unwrap();
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_nixify"))
+            .arg("review")
+            .arg("--input")
+            .arg(&input)
+            .arg("--output")
+            .arg(&output_path)
+            .arg("--defaults")
+            .output()
+            .unwrap()
+    };
+    assert!(run().status.success());
+    let selection = nixify::selection::read(&output_path).unwrap();
+    assert!(selection.groups[0].packages.iter().all(|p| p.keep));
+    assert!(!run().status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(output_path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+}
+
+#[test]
+fn explicit_choices_compose_with_evaluated_package_coverage() {
+    use nixify::{
+        coverage_eval::{Evidence, MatchEvidence},
+        draft, selection,
+    };
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\n",
+        "firefox\nchromium\n",
+        "",
+    )
+    .unwrap();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    let count = mapping::decisions(&inventory)
+        .iter()
+        .filter_map(|d| d.nixpkgs_attribute.as_ref())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let evidence = Evidence {
+        schema_version: 1,
+        nixpkgs_revision: revision.into(),
+        system: "x86_64-linux".into(),
+        matched: [(
+            "firefox".into(),
+            MatchEvidence {
+                path: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-firefox".into(),
+                outputs: vec!["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-firefox".into()],
+                priority: 5,
+            },
+        )]
+        .into_iter()
+        .collect(),
+        candidate_count: count,
+        unavailable_candidates: 0,
+        unavailable_system_packages: 0,
+    };
+    let mut choices = selection::propose(&inventory);
+    choices.groups[0]
+        .packages
+        .iter_mut()
+        .find(|p| p.package == "chromium")
+        .unwrap()
+        .keep = false;
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    output::generate_with_selection(
+        &inventory,
+        &dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        Some(&evidence),
+        Some(&choices),
+    )
+    .unwrap();
+    let packages = fs::read_to_string(dir.join("packages.nix")).unwrap();
+    assert!(!packages.contains("pkgs.\"chromium\""));
+    assert!(!packages.contains("pkgs.\"firefox\""));
+    assert!(draft::expected_attributes(&dir, &inventory)
+        .unwrap()
+        .1
+        .is_empty());
+    let report = fs::read_to_string(dir.join("migration-report.md")).unwrap();
+    assert!(report.contains("explicitly excluded"));
+    assert!(report.contains("evaluated target system packages"));
+}
+
+#[test]
+fn generate_cli_uses_saved_application_selection() {
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\n",
+        "firefox\nchromium\n",
+        "",
+    )
+    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("inventory.json");
+    let choice_path = dir.path().join("selection.json");
+    let draft_path = dir.path().join("draft");
+    fs::write(&input, serde_json::to_vec(&inventory).unwrap()).unwrap();
+    let mut selection = nixify::selection::propose(&inventory);
+    selection.groups[0]
+        .packages
+        .iter_mut()
+        .find(|p| p.package == "chromium")
+        .unwrap()
+        .keep = false;
+    fs::write(&choice_path, serde_json::to_vec(&selection).unwrap()).unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["generate", "--input"])
+        .arg(&input)
+        .args(["--output"])
+        .arg(&draft_path)
+        .args(["--selection"])
+        .arg(&choice_path)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let packages = fs::read_to_string(draft_path.join("packages.nix")).unwrap();
+    assert!(packages.contains("pkgs.\"firefox\""));
+    assert!(!packages.contains("pkgs.\"chromium\""));
+    assert!(draft_path.join("package-selection.json").exists());
+}

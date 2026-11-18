@@ -5,7 +5,7 @@ use nixify::{
 };
 use std::{
     fs::{File, OpenOptions},
-    io::{Read, Write},
+    io::{IsTerminal, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -76,12 +76,25 @@ enum Command {
         /// Explicitly reviewed mappings in JSON; never inferred automatically.
         #[arg(long)]
         reviewed_mappings: Option<PathBuf>,
+        /// Apply choices saved by the review command.
+        #[arg(long)]
+        selection: Option<PathBuf>,
         /// Explicitly choose a desktop to enable; detection alone remains a hint.
         #[arg(long, value_enum)]
         desktop: Option<DesktopSelection>,
         /// Include sanitized, explicitly generated configuration inspection(s).
         #[arg(long)]
         config_inspection: Vec<PathBuf>,
+    },
+    /// Review ambiguous application roles and save explicit package selections.
+    Review {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        /// Save the conservative defaults without prompting.
+        #[arg(long)]
+        defaults: bool,
     },
     /// Inspect an explicitly selected configuration file using a supported profile.
     InspectConfig {
@@ -165,6 +178,48 @@ macro_rules! print {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     match Cli::parse().command {
+        Command::Review {
+            input,
+            output,
+            defaults,
+        } => {
+            let inventory = read_inventory(&input)?;
+            match std::fs::symlink_metadata(&output) {
+                Ok(_) => return Err(format!("output already exists: {}", output.display()).into()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            let mut selection = nixify::selection::propose(&inventory);
+            if !defaults && !selection.groups.is_empty() {
+                eprintln!(
+                    "Only recognized ambiguous roles are shown; other packages remain unchanged."
+                );
+                let stdin = std::io::stdin();
+                if !stdin.is_terminal() {
+                    return Err("interactive review requires a terminal; use --defaults to save conservative choices".into());
+                }
+                nixify::selection::review(
+                    &mut selection,
+                    &mut stdin.lock(),
+                    &mut std::io::stdout().lock(),
+                )
+                .map_err(std::io::Error::other)?;
+            }
+            #[cfg(unix)]
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            options
+                .open(&output)?
+                .write_all((serde_json::to_string_pretty(&selection)? + "\n").as_bytes())?;
+            eprintln!(
+                "Saved {} review groups to {}. Pass --selection to generate.",
+                selection.groups.len(),
+                output.display()
+            );
+        }
         Command::HardwareConfig {
             output,
             include_filesystems,
@@ -231,6 +286,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             nixpkgs_rev,
             nixpkgs,
             reviewed_mappings,
+            selection,
             desktop,
             config_inspection: inspection_paths,
         } => {
@@ -252,6 +308,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 inspections.push(inspection);
             }
             let selected = desktop.map(Into::into);
+            let selection = selection
+                .as_deref()
+                .map(nixify::selection::read)
+                .transpose()
+                .map_err(std::io::Error::other)?;
+            if let Some(selection) = &selection {
+                nixify::selection::validate(selection, &inventory)
+                    .map_err(std::io::Error::other)?;
+            }
             let revision = draft::normalize_revision(&revision).map_err(std::io::Error::other)?;
             let evidence = if let Some(checkout) = nixpkgs {
                 if dir.try_exists()? {
@@ -272,7 +337,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 None
             };
-            output::generate_with_coverage(
+            output::generate_with_selection(
                 &inventory,
                 &dir,
                 &revision,
@@ -280,6 +345,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 selected,
                 &inspections,
                 evidence.as_ref(),
+                selection.as_ref(),
             )?;
             eprintln!("Wrote migration draft to {}", dir.display());
         }

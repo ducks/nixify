@@ -13,6 +13,7 @@ pub mod mapping;
 pub mod network;
 pub mod output;
 pub mod package_groups;
+pub mod selection;
 pub mod service_mapping;
 pub mod suggest;
 pub mod systemd;
