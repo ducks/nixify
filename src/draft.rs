@@ -199,9 +199,117 @@ pub fn expected_attributes(
         Err(error) => return Err(format!("cannot inspect package decisions: {error}")),
     };
     if let Some(entries) = &snapshot {
+        let selection_path = dir.join("package-selection.json");
+        let selection = match fs::symlink_metadata(&selection_path) {
+            Ok(_) => Some(crate::selection::read(&selection_path)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(format!("cannot inspect package selection: {error}")),
+        };
+        let mut selection_check = entries.clone();
+        for decision in &mut selection_check {
+            decision.excluded_by_selection = false;
+        }
+        if let Some(selection) = &selection {
+            crate::selection::apply(selection, inventory, &mut selection_check)?;
+        }
+        if entries
+            .iter()
+            .zip(&selection_check)
+            .any(|(a, b)| a.excluded_by_selection != b.excluded_by_selection)
+        {
+            return Err("package selection does not match generated package decisions".into());
+        }
+        let has_evidence = match fs::symlink_metadata(dir.join("coverage-evaluation.json")) {
+            Ok(_) => true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => return Err(format!("cannot inspect evaluated coverage: {error}")),
+        };
+        if has_evidence || entries.iter().any(|d| d.covered_by.is_some()) {
+            let read_module = |name: &str| -> Result<String, String> {
+                let path = dir.join(name);
+                let metadata = fs::symlink_metadata(&path)
+                    .map_err(|e| format!("cannot inspect {name}: {e}"))?;
+                if !metadata.file_type().is_file() || metadata.len() > 1024 * 1024 {
+                    return Err(format!(
+                        "{name} must be a regular non-symlink file under 1 MiB"
+                    ));
+                }
+                fs::read_to_string(path).map_err(|e| format!("cannot read {name}: {e}"))
+            };
+            if read_module("configuration.nix")? != configuration() {
+                return Err("configuration.nix was edited; omitted packages need review".into());
+            }
+            let desktop_text = read_module("desktop.nix")?;
+            let selected = [
+                None,
+                Some(crate::desktop::DesktopKind::Hyprland),
+                Some(crate::desktop::DesktopKind::Xfce),
+            ]
+            .into_iter()
+            .find(|selected| {
+                desktop_text == crate::output::desktop_nix_with_selection(inventory, *selected)
+            })
+            .ok_or("desktop.nix was edited; omitted packages need review")?;
+            let mut checked = entries.clone();
+            crate::coverage::apply(inventory, &mut checked, &revision, selected);
+            let evidence_path = dir.join("coverage-evaluation.json");
+            match fs::symlink_metadata(&evidence_path) {
+                Ok(meta) if meta.file_type().is_file() && meta.len() <= 4 * 1024 * 1024 => {
+                    let bytes = fs::read(&evidence_path)
+                        .map_err(|e| format!("cannot read evaluated coverage: {e}"))?;
+                    let evidence: crate::coverage_eval::Evidence =
+                        serde_json::from_slice(&bytes)
+                            .map_err(|e| format!("invalid evaluated coverage: {e}"))?;
+                    for decision in &mut checked {
+                        decision.covered_by = None;
+                    }
+                    crate::coverage_eval::apply(inventory, &mut checked, &evidence, &revision)?;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                _ => {
+                    return Err(
+                        "coverage-evaluation.json must be a regular non-symlink file under 4 MiB"
+                            .into(),
+                    )
+                }
+            }
+            if entries
+                .iter()
+                .zip(&checked)
+                .any(|(actual, expected)| actual.covered_by != expected.covered_by)
+            {
+                return Err(
+                    "package coverage evidence does not match the inventory or target revision"
+                        .into(),
+                );
+            }
+            {
+                let inspection_path = dir.join("configuration-inspections.json");
+                let inspections: Vec<crate::config_inspection::Inspection> = match fs::symlink_metadata(&inspection_path) {
+                    Ok(metadata) if metadata.file_type().is_file() && metadata.len() <= 1024 * 1024 => {
+                        let bytes = fs::read(&inspection_path).map_err(|e| format!("cannot read inspections: {e}"))?;
+                        let values: Vec<crate::config_inspection::Inspection> = serde_json::from_slice(&bytes).map_err(|e| format!("invalid inspections: {e}"))?;
+                        for value in &values { value.validate()?; }
+                        values
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+                    _ => return Err("configuration-inspections.json must be a regular non-symlink file under 1 MiB".into()),
+                };
+                let expected = crate::output::services_nix_with_inspections(
+                    &crate::service_mapping::decisions(inventory),
+                    &inspections,
+                );
+                if read_module("services.nix")? != expected {
+                    return Err(
+                        "services.nix was edited; omitted service packages need review".into(),
+                    );
+                }
+            }
+        }
         if package_text == crate::output::packages_nix(entries) {
             let attrs = entries
                 .iter()
+                .filter(|d| d.covered_by.is_none() && !d.excluded_by_selection)
                 .filter_map(|d| d.nixpkgs_attribute.clone())
                 .collect::<std::collections::BTreeSet<_>>()
                 .into_iter()

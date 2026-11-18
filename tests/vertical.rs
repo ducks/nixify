@@ -86,6 +86,9 @@ fn conservative_mapping_and_deterministic_output() {
     assert_eq!(a, output::packages_nix(&mapping::decisions(&inv)));
     assert!(!a.contains("foreign-tool"));
     assert!(!a.contains("libexample"));
+    let report = output::report(&inv, &mapping::decisions(&inv));
+    assert!(report.contains("this draft does not enable unfree packages"));
+    assert!(report.contains("checks do not establish buildability"));
 }
 #[test]
 fn schema_version_and_injection_are_rejected() {
@@ -156,6 +159,31 @@ fn cli_generates_and_reports_without_nix() {
             0o600
         );
     }
+}
+
+#[test]
+fn report_handles_a_closed_stdout_pipe() {
+    use std::process::Stdio;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let file = tmp.path().join("inventory.json");
+    fs::write(&file, serde_json::to_vec(&fixture()).unwrap()).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .arg("report")
+        .arg("--input")
+        .arg(&file)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stdout.take());
+    let result = child.wait_with_output().unwrap();
+    assert!(result.status.success());
+    assert!(
+        result.stderr.is_empty(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
 }
 
 #[test]
@@ -912,4 +940,1180 @@ fn reviewed_nested_attributes_are_quoted_and_snapshotted() {
         .unwrap()
         .1
         .contains(&"xfce.exo".to_owned()));
+}
+
+#[test]
+fn desktop_and_workstation_services_require_persistent_system_enablement() {
+    use nixify::{inventory::Scope, service_mapping, systemd};
+    let mut inv = fixture();
+    inv.service_scopes = vec![
+        systemd::from_outputs(Scope::System, Some("avahi-daemon.service enabled enabled\nbluetooth.service enabled enabled\ncups.service enabled enabled\nlibvirtd.service enabled enabled\ntlp.service enabled enabled\nollama.service disabled disabled\nmullvad-daemon.service enabled enabled\n"), Some("ollama.service loaded active running Ollama\n")),
+        systemd::from_outputs(Scope::User, Some("ollama.service enabled enabled\n"), None),
+    ];
+    let decisions = service_mapping::decisions(&inv);
+    let module = output::services_nix(&decisions);
+    for option in [
+        "services.avahi.enable",
+        "hardware.bluetooth.enable",
+        "services.printing.enable",
+        "virtualisation.libvirtd.enable",
+        "services.tlp.enable",
+        "services.mullvad-vpn.enable",
+    ] {
+        assert!(
+            module.contains(&format!("{option} = true;")),
+            "missing {option}"
+        );
+    }
+    assert!(!module.contains("services.ollama.enable"));
+    assert!(decisions
+        .iter()
+        .find(|d| d.service == "mullvad-daemon.service")
+        .unwrap()
+        .reason
+        .contains("firewall"));
+}
+
+#[test]
+fn cli_desktop_choice_is_explicit_and_preserves_other_hints() {
+    use nixify::{desktop, inventory::Scope, systemd};
+    let mut inv = fixture();
+    inv.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("lemurs.service enabled enabled\n"),
+        None,
+    )];
+    assert_eq!(desktop::enabled_display_managers(&inv), vec!["Lemurs"]);
+    let root = tempfile::tempdir().unwrap();
+    inv.desktop = Some(desktop::detect(
+        &inv,
+        Some("XFCE"),
+        Some("x11"),
+        root.path(),
+    ));
+    let inventory_path = root.path().join("inventory.json");
+    fs::write(&inventory_path, serde_json::to_vec(&inv).unwrap()).unwrap();
+    let dir = root.path().join("draft");
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["generate", "--input"])
+        .arg(&inventory_path)
+        .args(["--output"])
+        .arg(&dir)
+        .args(["--desktop", "hyprland"])
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let module = fs::read_to_string(dir.join("desktop.nix")).unwrap();
+    assert!(module.contains("  programs.hyprland.enable = true; # explicitly selected"));
+    assert!(module.contains("  # services.xserver.desktopManager.xfce.enable = true;"));
+    let report = fs::read_to_string(dir.join("migration-report.md")).unwrap();
+    assert!(report.contains("Explicit desktop selection: Hyprland"));
+    assert!(report.contains("Lemurs"));
+}
+
+#[test]
+fn configuration_discovery_is_fixed_location_and_never_reads_contents() {
+    use nixify::{
+        config_evidence::{self, ConfigId, ConfigState},
+        inventory::Package,
+    };
+    use std::os::unix::fs::symlink;
+    let mut inv = fixture();
+    for name in ["hyprland", "waybar", "lemurs"] {
+        inv.packages.push(Package {
+            name: name.into(),
+            version: "1".into(),
+            explicitly_installed: true,
+            foreign: false,
+            evidence: vec![],
+        });
+    }
+    let root = tempfile::tempdir().unwrap();
+    let sys = root.path().join("sysroot");
+    let home = root.path().join("home");
+    fs::create_dir_all(sys.join("etc/lemurs")).unwrap();
+    fs::create_dir_all(home.join(".config/hypr")).unwrap();
+    fs::write(
+        sys.join("etc/lemurs/config.toml"),
+        "password=secret-test-value",
+    )
+    .unwrap();
+    fs::write(
+        home.join(".config/hypr/hyprland.conf"),
+        "token=secret-test-value",
+    )
+    .unwrap();
+    symlink(home.join(".config/hypr"), home.join(".config/waybar")).unwrap();
+    let entries = config_evidence::scan_at(&inv, &sys, Some(&home));
+    let state = |id| entries.iter().find(|e| e.id == id).unwrap().state;
+    assert_eq!(state(ConfigId::Lemurs), ConfigState::Present);
+    assert_eq!(state(ConfigId::Hyprland), ConfigState::Present);
+    assert_eq!(state(ConfigId::Waybar), ConfigState::SymlinkNotFollowed);
+    assert!(!serde_json::to_string(&entries)
+        .unwrap()
+        .contains("secret-test-value"));
+    assert!(!serde_json::to_string(&entries)
+        .unwrap()
+        .contains(root.path().to_str().unwrap()));
+    inv.config_evidence = Some(entries);
+    inv.validate().unwrap();
+    let report = output::report(&inv, &mapping::decisions(&inv));
+    assert!(report.contains("$HOME/.config/hypr/hyprland.conf"));
+    assert!(report.contains("symlink encountered"));
+    assert!(!report.contains("secret-test-value"));
+    let empty_home = config_evidence::scan_at(&inv, &sys, None);
+    assert_eq!(
+        empty_home
+            .iter()
+            .find(|e| e.id == ConfigId::Hyprland)
+            .unwrap()
+            .state,
+        ConfigState::Unavailable
+    );
+}
+
+#[test]
+fn old_inventory_without_config_evidence_remains_valid() {
+    let mut value = serde_json::to_value(fixture()).unwrap();
+    value.as_object_mut().unwrap().remove("config_evidence");
+    let inventory: Inventory = serde_json::from_value(value).unwrap();
+    assert!(inventory.config_evidence.is_none());
+    inventory.validate().unwrap();
+}
+
+#[test]
+fn config_profiles_retain_only_allowlisted_typed_settings() {
+    use nixify::config_inspection::{self as config, Profile, Setting};
+    let source = "general {\n layout = dwindle\n}\ninput {\n natural_scroll = true\n touchpad {\n disable_while_typing = true\n }\n}\nenv = TOKEN,do-not-save\nexec-once = private-command\n";
+    let hypr = config::inspect(Profile::Hyprland, source).unwrap();
+    assert!(matches!(
+        hypr.settings.as_slice(),
+        [
+            Setting::HyprlandLayout(_),
+            Setting::HyprlandNaturalScroll(true)
+        ]
+    ));
+    assert_eq!(hypr.unhandled_items, 3);
+    let encoded = serde_json::to_string(&hypr).unwrap();
+    assert!(!encoded.contains("do-not-save") && !encoded.contains("private-command"));
+    let overridden = config::inspect(
+        Profile::Hyprland,
+        "source = private.conf\ngeneral {\nlayout = master\n}\n",
+    )
+    .unwrap();
+    assert!(overridden.incomplete && overridden.settings.is_empty());
+    let duplicate = config::inspect(
+        Profile::Hyprland,
+        "input {\nnatural_scroll = true\nnatural_scroll = false\n}\n",
+    )
+    .unwrap();
+    assert!(duplicate.incomplete && duplicate.settings.is_empty());
+    let docker = config::inspect(
+        Profile::DockerDaemon,
+        r#"{"live-restore":true,"auths":{"secret":"hidden"}}"#,
+    )
+    .unwrap();
+    assert!(matches!(
+        docker.settings.as_slice(),
+        [Setting::DockerLiveRestore(true)]
+    ));
+    assert_eq!(docker.unhandled_items, 1);
+    assert!(!serde_json::to_string(&docker).unwrap().contains("hidden"));
+    assert!(config::inspect(
+        Profile::DockerDaemon,
+        r#"{"live-restore":true,"live-restore":false}"#
+    )
+    .is_err());
+    assert!(config::inspect(Profile::DockerDaemon, r#"{"live-restore":"true"}"#).is_err());
+}
+
+#[test]
+fn inspected_docker_setting_requires_explicit_file_and_enabled_service() {
+    use nixify::{
+        config_inspection::{self as config, Profile},
+        inventory::Scope,
+        systemd,
+    };
+    let mut inv = fixture();
+    let inspection = config::inspect(
+        Profile::DockerDaemon,
+        r#"{"live-restore":true,"registry-token":"dont-copy"}"#,
+    )
+    .unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let review = mapping::ReviewedMappings::empty();
+    let revision = nixify::draft::default_revision().unwrap();
+    let disabled = root.path().join("disabled");
+    output::generate_with_inspections(
+        &inv,
+        &disabled,
+        &revision,
+        &review,
+        None,
+        std::slice::from_ref(&inspection),
+    )
+    .unwrap();
+    assert!(!fs::read_to_string(disabled.join("services.nix"))
+        .unwrap()
+        .contains("live-restore"));
+    inv.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("docker.service enabled enabled\n"),
+        None,
+    )];
+    let enabled = root.path().join("enabled");
+    output::generate_with_inspections(&inv, &enabled, &revision, &review, None, &[inspection])
+        .unwrap();
+    let module = fs::read_to_string(enabled.join("services.nix")).unwrap();
+    assert!(module.contains("virtualisation.docker.daemon.settings.\"live-restore\" = true;"));
+    assert!(!module.contains("dont-copy"));
+    assert!(
+        !fs::read_to_string(enabled.join("configuration-inspections.json"))
+            .unwrap()
+            .contains("dont-copy")
+    );
+}
+
+#[test]
+fn explicit_config_read_rejects_symlinks_and_oversized_files() {
+    use std::os::unix::fs::symlink;
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("file");
+    fs::write(&file, vec![b'x'; 256 * 1024 + 1]).unwrap();
+    assert!(nixify::config_inspection::read_explicit(&file).is_err());
+    let link = dir.path().join("link");
+    symlink(&file, &link).unwrap();
+    assert!(nixify::config_inspection::read_explicit(&link).is_err());
+}
+
+#[test]
+fn cli_inspects_config_and_generates_draft_without_raw_values() {
+    use nixify::{inventory::Scope, systemd};
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("daemon.json");
+    let inspection = temp.path().join("inspection.json");
+    fs::write(
+        &source,
+        r#"{"live-restore":false,"secret":"do-not-export"}"#,
+    )
+    .unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["inspect-config", "--profile", "docker-daemon", "--file"])
+        .arg(&source)
+        .args(["--output"])
+        .arg(&inspection)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(!fs::read_to_string(&inspection)
+        .unwrap()
+        .contains("do-not-export"));
+    let mut inv = fixture();
+    inv.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("docker.service enabled enabled\n"),
+        None,
+    )];
+    let inventory = temp.path().join("inventory.json");
+    fs::write(&inventory, serde_json::to_vec(&inv).unwrap()).unwrap();
+    let dir = temp.path().join("draft");
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["generate", "--input"])
+        .arg(&inventory)
+        .args(["--output"])
+        .arg(&dir)
+        .args(["--config-inspection"])
+        .arg(&inspection)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(fs::read_to_string(dir.join("services.nix"))
+        .unwrap()
+        .contains("daemon.settings.\"live-restore\" = false;"));
+    assert!(!fs::read_to_string(dir.join("migration-report.md"))
+        .unwrap()
+        .contains("do-not-export"));
+}
+
+#[test]
+fn catalog_suggestions_are_ranked_unreviewed_and_handle_nested_names() {
+    use nixify::{catalog, inventory::Package};
+    let mut inv = fixture();
+    for (name, foreign) in [("helix-bin", true), ("mystery", false)] {
+        inv.packages.push(Package {
+            name: name.into(),
+            version: "1".into(),
+            explicitly_installed: true,
+            foreign,
+            evidence: vec![],
+        });
+    }
+    let catalog_data = serde_json::json!({
+        "editors.helix": {"pname":"helix", "version":"1", "meta":{"description":"A text editor"}},
+        "tools.hidden": {"pname":"mystery", "version":"2", "meta":{"description":"Different attribute name"}},
+        "others.mystery": {"pname":"other", "version":"3"},
+        "evil\";abort": {"pname":"mystery"}
+    });
+    let report = catalog::from_value(
+        &inv,
+        &catalog_data,
+        "0123456789abcdef0123456789abcdef01234567",
+    )
+    .unwrap();
+    let helix = report
+        .matches
+        .iter()
+        .find(|m| m.source_package == "helix-bin")
+        .unwrap();
+    assert_eq!(helix.candidates[0].attribute, "editors.helix");
+    assert_eq!(helix.candidates[0].match_kind, "foreign_suffix_removed");
+    let mystery = report
+        .matches
+        .iter()
+        .find(|m| m.source_package == "mystery")
+        .unwrap();
+    assert_eq!(mystery.candidates.len(), 2);
+    assert_eq!(mystery.candidates[0].attribute, "others.mystery");
+    assert_eq!(mystery.candidates[1].match_kind, "package_name");
+    assert!(report.warning.contains("not equivalence"));
+    assert!(catalog::from_value(&inv, &catalog_data, "invalid").is_err());
+}
+
+#[test]
+fn catalog_cli_reads_offline_and_never_overwrites() {
+    let root = tempfile::tempdir().unwrap();
+    let inv = root.path().join("inventory.json");
+    let catalog = root.path().join("packages.json");
+    let out = root.path().join("matches.json");
+    fs::write(&inv, serde_json::to_vec(&fixture()).unwrap()).unwrap();
+    fs::write(&catalog, r#"{"packages":{"tools.foreign-tool":{"pname":"foreign-tool","version":"1","meta":{"description":"Example"}}},"version":"fixture"}"#).unwrap();
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_nixify"))
+            .args(["catalog-suggest", "--input"])
+            .arg(&inv)
+            .args(["--catalog"])
+            .arg(&catalog)
+            .args([
+                "--revision",
+                "0123456789abcdef0123456789abcdef01234567",
+                "--output",
+            ])
+            .arg(&out)
+            .output()
+            .unwrap()
+    };
+    assert!(run().status.success());
+    let data = fs::read_to_string(&out).unwrap();
+    assert!(data.contains("tools.foreign-tool"));
+    assert!(!run().status.success());
+    assert_eq!(fs::read_to_string(&out).unwrap(), data);
+}
+
+#[test]
+fn channel_catalog_rejects_bad_wrapper_and_trailing_data() {
+    use nixify::catalog;
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("packages.json");
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    for text in [
+        r#"{"version":"1"}"#,
+        r#"{"packages":{}} trailing"#,
+        r#"{"packages":{},"packages":{}}"#,
+    ] {
+        fs::write(&file, text).unwrap();
+        assert!(catalog::read(&fixture(), &file, revision).is_err());
+    }
+}
+
+#[test]
+fn catalog_suggests_distribution_name_variants_without_promoting_them() {
+    use nixify::inventory::Package;
+    let mut inv = fixture();
+    for name in ["grep", "python-pipx", "xorg-xinit", "procps-ng"] {
+        inv.packages.push(Package {
+            name: name.into(),
+            version: "1".into(),
+            explicitly_installed: true,
+            foreign: false,
+            evidence: vec![],
+        });
+    }
+    let data = serde_json::json!({"packages": {
+        "gnugrep": {"pname":"gnugrep"}, "pipx": {"pname":"pipx"},
+        "xinit": {"pname":"xinit"}, "procps": {"pname":"procps"}
+    }});
+    let report =
+        nixify::catalog::from_value(&inv, &data, "0123456789abcdef0123456789abcdef01234567")
+            .unwrap();
+    for (name, attribute, kind) in [
+        ("grep", "gnugrep", "gnu_prefix_added"),
+        ("python-pipx", "pipx", "distribution_prefix_removed"),
+        ("xorg-xinit", "xinit", "distribution_prefix_removed"),
+        ("procps-ng", "procps", "known_name_variant"),
+    ] {
+        let entry = report
+            .matches
+            .iter()
+            .find(|entry| entry.source_package == name)
+            .unwrap();
+        assert!(entry
+            .candidates
+            .iter()
+            .any(|candidate| candidate.attribute == attribute && candidate.match_kind == kind));
+        assert_eq!(
+            mapping::decision(inv.packages.iter().find(|p| p.name == name).unwrap()).status,
+            Status::Unmapped
+        );
+    }
+}
+
+#[test]
+fn hardware_generator_uses_show_mode_and_excludes_filesystems_by_default() {
+    let config = nixify::hardware::generate_config_with(false, |program, args| {
+        assert_eq!(program, "nixos-generate-config");
+        assert_eq!(args, ["--show-hardware-config", "--no-filesystems"]);
+        Ok("{ ... }: {}\n".into())
+    })
+    .unwrap();
+    assert!(config.contains("{ ... }"));
+    nixify::hardware::generate_config_with(true, |_, args| {
+        assert_eq!(args, ["--show-hardware-config"]);
+        Ok("{}".into())
+    })
+    .unwrap();
+    assert!(nixify::hardware::generate_config_with(false, |_, _| Ok(String::new())).is_err());
+}
+
+#[test]
+fn hardware_config_cli_captures_stdout_without_overwriting() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let fake = root.path().join("nixos-generate-config");
+    fs::write(&fake, "#!/bin/sh\n[ \"$1\" = --show-hardware-config ] && [ \"$2\" = --no-filesystems ] || exit 2\nprintf '{ ... }: {}\\n'\n").unwrap();
+    fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+    let target = root.path().join("hardware.nix");
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_nixify"))
+            .args(["hardware-config", "--output"])
+            .arg(&target)
+            .env("PATH", root.path())
+            .output()
+            .unwrap()
+    };
+    let first = run();
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    assert_eq!(fs::read_to_string(&target).unwrap(), "{ ... }: {}\n");
+    assert_eq!(
+        fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert!(!run().status.success());
+    assert_eq!(fs::read_to_string(&target).unwrap(), "{ ... }: {}\n");
+}
+
+#[test]
+fn verified_coverage_is_default_revision_scoped_and_auditable() {
+    use nixify::{desktop::DesktopKind, draft, inventory::Scope, systemd};
+    let mut inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "bzip2 1\ndocker 1\nhyprland 1\nnetworkmanager 1\nfirefox 1\n",
+        "bzip2\ndocker\nhyprland\nnetworkmanager\nfirefox\n",
+        "",
+    )
+    .unwrap();
+    inventory.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("docker.service enabled enabled\nNetworkManager.service enabled enabled\n"),
+        None,
+    )];
+    let revision = "eeeb90a1dd3c9bea3afdbc76fd34d0fb2a727c7a";
+    let temp = tempfile::tempdir().unwrap();
+    let dest = temp.path().join("draft");
+    output::generate_with_desktop(
+        &inventory,
+        &dest,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        Some(DesktopKind::Hyprland),
+    )
+    .unwrap();
+    let packages = fs::read_to_string(dest.join("packages.nix")).unwrap();
+    let decisions: Vec<mapping::Decision> =
+        serde_json::from_slice(&fs::read(dest.join("package-decisions.json")).unwrap()).unwrap();
+    for name in ["docker", "hyprland", "networkmanager"] {
+        let decision = decisions.iter().find(|d| d.package == name).unwrap();
+        assert!(decision.covered_by.is_some(), "{name}: {decision:?}");
+        assert!(!packages.contains(&format!("pkgs.\"{name}\"")));
+    }
+    assert!(packages.contains("pkgs.\"bzip2\""));
+    assert!(packages.contains("pkgs.\"firefox\""));
+    let report = fs::read_to_string(dest.join("migration-report.md")).unwrap();
+    assert!(report.contains("Direct package entries omitted"));
+    assert!(report.contains("programs.hyprland.enable"));
+    let (_, attrs) = draft::expected_attributes(&dest, &inventory).unwrap();
+    assert!(attrs.contains(&"firefox".to_owned()));
+    assert!(!attrs.contains(&"docker".to_owned()));
+    let mut stale = decisions.clone();
+    stale
+        .iter_mut()
+        .find(|d| d.package == "bzip2")
+        .unwrap()
+        .covered_by = Some(nixify::coverage::Coverage {
+        provider: "NixOS required system packages".into(),
+        nixpkgs_revision: revision.into(),
+    });
+    fs::write(dest.join("packages.nix"), output::packages_nix(&stale)).unwrap();
+    fs::write(
+        dest.join("package-decisions.json"),
+        serde_json::to_vec(&stale).unwrap(),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&dest, &inventory).is_err());
+    fs::write(dest.join("packages.nix"), &packages).unwrap();
+    fs::write(
+        dest.join("package-decisions.json"),
+        serde_json::to_vec(&decisions).unwrap(),
+    )
+    .unwrap();
+    let services = fs::read_to_string(dest.join("services.nix")).unwrap();
+    fs::write(
+        dest.join("services.nix"),
+        services.replace("virtualisation.docker.enable = true;", "# disabled"),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&dest, &inventory)
+        .unwrap_err()
+        .contains("services.nix was edited"));
+    fs::write(dest.join("services.nix"), services).unwrap();
+    let desktop = fs::read_to_string(dest.join("desktop.nix")).unwrap();
+    fs::write(
+        dest.join("desktop.nix"),
+        desktop.replace("programs.hyprland.enable = true;", "# disabled"),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&dest, &inventory)
+        .unwrap_err()
+        .contains("desktop.nix was edited"));
+
+    let inspection = nixify::config_inspection::inspect(
+        nixify::config_inspection::Profile::DockerDaemon,
+        r#"{"live-restore":true}"#,
+    )
+    .unwrap();
+    let inspected = temp.path().join("inspected");
+    output::generate_with_inspections(
+        &inventory,
+        &inspected,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        Some(DesktopKind::Hyprland),
+        &[inspection],
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&inspected, &inventory).is_ok());
+
+    let mut no_evidence = mapping::decisions(&inventory);
+    nixify::coverage::apply(
+        &inventory,
+        &mut no_evidence,
+        &"0".repeat(40),
+        Some(DesktopKind::Hyprland),
+    );
+    assert!(no_evidence.iter().all(|d| d.covered_by.is_none()));
+    inventory.source.architecture = "aarch64".into();
+    nixify::coverage::apply(
+        &inventory,
+        &mut no_evidence,
+        revision,
+        Some(DesktopKind::Hyprland),
+    );
+    assert!(no_evidence.iter().all(|d| d.covered_by.is_none()));
+}
+
+#[test]
+fn coverage_does_not_override_review_foreign_or_runtime_only_services() {
+    use nixify::{desktop::DesktopKind, inventory::Scope, systemd};
+    let mut inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "bzip2 1\ndocker 1\nhyprland 1\nnetworkmanager 1\n",
+        "bzip2\ndocker\nhyprland\nnetworkmanager\n",
+        "bzip2\n",
+    )
+    .unwrap();
+    inventory.service_scopes = vec![systemd::from_outputs(
+        Scope::System,
+        Some("docker.service enabled-runtime enabled\nNetworkManager.service enabled enabled\n"),
+        None,
+    )];
+    let review = mapping::ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: None,
+        mappings: vec![mapping::ReviewedMapping {
+            source_package: "networkmanager".into(),
+            nixpkgs_attribute: "networkmanager".into(),
+        }],
+    };
+    let revision = "9fbb54b33e91ee4ca368e35a78e0613c720600b3";
+    let mut decisions = mapping::reviewed_decisions(&inventory, &review, Some(revision)).unwrap();
+    nixify::coverage::apply(&inventory, &mut decisions, revision, None);
+    for name in ["bzip2", "docker", "hyprland", "networkmanager"] {
+        assert!(
+            decisions
+                .iter()
+                .find(|d| d.package == name)
+                .unwrap()
+                .covered_by
+                .is_none(),
+            "{name}"
+        );
+    }
+    // The newer revision's Hyprland override is not verified offline.
+    nixify::coverage::apply(
+        &inventory,
+        &mut decisions,
+        revision,
+        Some(DesktopKind::Hyprland),
+    );
+    assert!(decisions
+        .iter()
+        .find(|d| d.package == "hyprland")
+        .unwrap()
+        .covered_by
+        .is_none());
+}
+
+#[test]
+fn package_groups_are_generic_review_hints_not_install_decisions() {
+    let mut inventory = fixture();
+    let groups = nixify::package_groups::parse(
+        "development git\nshared neovim\ndevelopment neovim\n",
+        &inventory,
+    )
+    .unwrap();
+    assert_eq!(groups.len(), 2);
+    inventory.package_groups = Some(groups);
+    inventory.validate().unwrap();
+    let decisions = mapping::decisions(&inventory);
+    let before = output::packages_nix(&decisions);
+    let report = output::report(&inventory, &decisions);
+    assert!(report.contains("### `development` — 2 explicit"));
+    assert!(report.contains("Groups may overlap"));
+    assert!(report.contains("do not change the generated configuration"));
+    assert_eq!(
+        before,
+        output::packages_nix(&mapping::decisions(&inventory))
+    );
+    assert!(nixify::package_groups::parse("development no-such-package\n", &inventory).is_err());
+    assert!(
+        nixify::package_groups::parse("development git\ndevelopment git\n", &inventory).is_err()
+    );
+    assert!(nixify::package_groups::parse("bad;group git\n", &inventory).is_err());
+    assert!(nixify::package_groups::parse("development git extra\n", &inventory).is_err());
+    let mut old = serde_json::to_value(&inventory).unwrap();
+    old.as_object_mut().unwrap().remove("package_groups");
+    assert!(serde_json::from_value::<Inventory>(old)
+        .unwrap()
+        .package_groups
+        .is_none());
+}
+
+#[test]
+fn target_coverage_compares_generated_modules_and_persists_reviewable_evidence() {
+    use nixify::{coverage_eval, draft};
+    use std::collections::BTreeMap;
+    let inventory = fixture();
+    let root = tempfile::tempdir().unwrap();
+    let checkout = root.path().join("checkout");
+    fs::create_dir(&checkout).unwrap();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    fs::write(checkout.join(".git-revision"), revision).unwrap();
+    let evidence = coverage_eval::evaluate_with(&inventory, revision, &mapping::ReviewedMappings::empty(), None, &[], &checkout, |args| {
+        let argument = |name: &str| -> &str {
+            let index = args.windows(2).position(|x| x == ["--argstr", name]).unwrap();
+            args[index + 2]
+        };
+        let project = std::path::Path::new(argument("projectPath"));
+        assert_eq!(fs::read_to_string(project.join("packages.nix")).unwrap(), output::packages_nix(&[]));
+        let attrs: Vec<String> = serde_json::from_slice(&fs::read(argument("attributesPath")).unwrap()).unwrap();
+        let results: BTreeMap<_, _> = attrs.into_iter().map(|name| {
+            let result = if name == "git" {
+                serde_json::json!({"state":"matched", "evidence":{"path":"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-git", "outputs":["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-git"], "priority":5}})
+            } else {
+                serde_json::json!({"state":"unavailable", "evidence":null})
+            };
+            (name, result)
+        }).collect();
+        Ok(serde_json::json!({"results":results,"unavailable_system_packages":1,"failed_assertions":[]}).to_string())
+    }).unwrap();
+    assert_eq!(evidence.matched.len(), 1);
+    assert!(evidence.unavailable_candidates > 0);
+    let dir = root.path().join("draft");
+    output::generate_with_coverage(
+        &inventory,
+        &dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        Some(&evidence),
+    )
+    .unwrap();
+    assert!(!fs::read_to_string(dir.join("packages.nix"))
+        .unwrap()
+        .contains("pkgs.\"git\""));
+    assert!(fs::read_to_string(dir.join("migration-report.md"))
+        .unwrap()
+        .contains("evaluated target system packages"));
+    let (_, attrs) = draft::expected_attributes(&dir, &inventory).unwrap();
+    assert!(!attrs.contains(&"git".to_string()));
+    fs::remove_file(dir.join("coverage-evaluation.json")).unwrap();
+    assert!(draft::expected_attributes(&dir, &inventory).is_err());
+    let mut empty = evidence.clone();
+    empty.matched.clear();
+    let empty_dir = root.path().join("empty-matches");
+    output::generate_with_coverage(
+        &inventory,
+        &empty_dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        Some(&empty),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&empty_dir, &inventory).is_ok());
+    empty.schema_version = 99;
+    fs::write(
+        empty_dir.join("coverage-evaluation.json"),
+        serde_json::to_vec(&empty).unwrap(),
+    )
+    .unwrap();
+    assert!(draft::expected_attributes(&empty_dir, &inventory).is_err());
+}
+
+#[test]
+fn target_coverage_refuses_wrong_revision_and_incomplete_results() {
+    use nixify::coverage_eval;
+    let inventory = fixture();
+    let root = tempfile::tempdir().unwrap();
+    fs::write(
+        root.path().join(".git-revision"),
+        "ffffffffffffffffffffffffffffffffffffffff",
+    )
+    .unwrap();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    assert!(coverage_eval::evaluate_with(
+        &inventory,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        root.path(),
+        |_| panic!("must not evaluate mismatched checkout")
+    )
+    .unwrap_err()
+    .contains("does not match"));
+    fs::write(root.path().join(".git-revision"), revision).unwrap();
+    let error = coverage_eval::evaluate_with(
+        &inventory,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        root.path(),
+        |_| {
+            Ok(
+                r#"{"results":{},"unavailable_system_packages":0,"failed_assertions":[]}"#
+                    .to_owned(),
+            )
+        },
+    )
+    .unwrap_err();
+    assert!(error.contains("incomplete"));
+}
+
+#[test]
+fn evaluated_coverage_keeps_foreign_and_explicitly_reviewed_packages() {
+    use nixify::coverage_eval::{self, Evidence, MatchEvidence};
+    let mut inventory = fixture();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    let review = mapping::ReviewedMappings {
+        schema_version: 1,
+        nixpkgs_revision: None,
+        mappings: vec![mapping::ReviewedMapping {
+            source_package: "git".into(),
+            nixpkgs_attribute: "git".into(),
+        }],
+    };
+    let mut decisions = mapping::reviewed_decisions(&inventory, &review, Some(revision)).unwrap();
+    let count = decisions
+        .iter()
+        .filter_map(|d| d.nixpkgs_attribute.as_ref())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let evidence = Evidence {
+        schema_version: 1,
+        nixpkgs_revision: revision.into(),
+        system: "x86_64-linux".into(),
+        matched: [(
+            "git".into(),
+            MatchEvidence {
+                path: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-git".into(),
+                outputs: vec!["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-git".into()],
+                priority: 5,
+            },
+        )]
+        .into_iter()
+        .collect(),
+        candidate_count: count,
+        unavailable_candidates: 0,
+        unavailable_system_packages: 0,
+    };
+    coverage_eval::apply(&inventory, &mut decisions, &evidence, revision).unwrap();
+    assert!(decisions
+        .iter()
+        .find(|d| d.package == "git")
+        .unwrap()
+        .covered_by
+        .is_none());
+    let mut decisions = mapping::decisions(&inventory);
+    inventory
+        .packages
+        .iter_mut()
+        .find(|p| p.name == "git")
+        .unwrap()
+        .foreign = true;
+    coverage_eval::apply(&inventory, &mut decisions, &evidence, revision).unwrap();
+    assert!(decisions
+        .iter()
+        .find(|d| d.package == "git")
+        .unwrap()
+        .covered_by
+        .is_none());
+}
+
+#[test]
+#[ignore = "requires nix-instantiate; run explicitly for target coverage integration"]
+fn nix_target_coverage_respects_outputs_and_link_priority() {
+    use nixify::coverage_eval;
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "git 1\nneovim 1\nbzip2 1\n",
+        "git\nneovim\nbzip2\n",
+        "",
+    )
+    .unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let checkout = root.path().join("nixpkgs");
+    fs::create_dir_all(checkout.join("nixos/lib")).unwrap();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    fs::write(checkout.join(".git-revision"), revision).unwrap();
+    fs::write(checkout.join("nixos/lib/eval-config.nix"), r#"
+{ system, modules }:
+let
+  mk = name: priority: outputs:
+    let path = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-" + name;
+    in { outPath = path; out.outPath = path; bin.outPath = path + "-bin"; meta = { inherit priority; outputsToInstall = outputs; }; };
+  git = mk "git" 5 [ "out" ];
+  neovim = mk "neovim" 5 [ "out" ];
+  bzip2 = mk "bzip2" 5 [ "out" "bin" ];
+  lib = {
+    splitString = separator: value: [ value ];
+    attrByPath = parts: fallback: attrs: if builtins.hasAttr (builtins.head parts) attrs then attrs.${builtins.head parts} else fallback;
+    meta.defaultPriority = 5;
+  };
+in {
+  pkgs = { inherit lib git neovim bzip2; };
+  config = {
+    environment = { systemPackages = [ git (mk "neovim" 8 [ "out" ]) (mk "bzip2" 5 [ "out" ]) ]; extraOutputsToInstall = []; };
+    assertions = [];
+  };
+}
+"#).unwrap();
+    let evidence = coverage_eval::evaluate(
+        &inventory,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        &checkout,
+    )
+    .unwrap();
+    assert_eq!(
+        evidence
+            .matched
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["git"]
+    );
+    assert_eq!(evidence.unavailable_candidates, 0);
+}
+
+#[test]
+fn application_review_defaults_to_all_and_applies_explicit_choices() {
+    use nixify::{draft, selection};
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\nneovim 1\nhelix 1\ngit 1\n",
+        "firefox\nchromium\nneovim\nhelix\ngit\n",
+        "",
+    )
+    .unwrap();
+    let mut choices = selection::propose(&inventory);
+    assert_eq!(choices.groups.len(), 2);
+    assert!(choices
+        .groups
+        .iter()
+        .flat_map(|g| &g.packages)
+        .all(|p| p.keep));
+    let mut messages = Vec::new();
+    // Groups are sorted: editors, then browsers. Keep both editors and choose
+    // only the second browser. This is explicit input, not an inferred default.
+    selection::review(
+        &mut choices,
+        &mut std::io::Cursor::new(b"\n2\n"),
+        &mut messages,
+    )
+    .unwrap();
+    let browsers = choices
+        .groups
+        .iter()
+        .find(|g| g.role == "Web browsers")
+        .unwrap();
+    assert_eq!(browsers.packages.iter().filter(|p| p.keep).count(), 1);
+    assert_eq!(
+        browsers.packages.iter().find(|p| p.keep).unwrap().package,
+        "firefox"
+    );
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    output::generate_with_selection(
+        &inventory,
+        &dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        None,
+        Some(&choices),
+    )
+    .unwrap();
+    let packages = fs::read_to_string(dir.join("packages.nix")).unwrap();
+    assert!(!packages.contains("pkgs.\"chromium\""));
+    assert!(packages.contains("pkgs.\"firefox\""));
+    assert!(packages.contains("pkgs.\"git\""));
+    assert!(fs::read_to_string(dir.join("migration-report.md"))
+        .unwrap()
+        .contains("Direct entry excluded by explicit selection"));
+    let (_, attrs) = draft::expected_attributes(&dir, &inventory).unwrap();
+    assert!(!attrs.contains(&"chromium".to_string()));
+    fs::remove_file(dir.join("package-selection.json")).unwrap();
+    assert!(draft::expected_attributes(&dir, &inventory).is_err());
+}
+
+#[test]
+fn application_review_rejects_stale_or_injected_choices_and_handles_none() {
+    use nixify::selection;
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\n",
+        "firefox\nchromium\n",
+        "",
+    )
+    .unwrap();
+    let mut choices = selection::propose(&inventory);
+    selection::review(
+        &mut choices,
+        &mut std::io::Cursor::new(b"not-a-number\nnone\n"),
+        &mut Vec::new(),
+    )
+    .unwrap();
+    assert!(choices.groups[0].packages.iter().all(|p| !p.keep));
+    let mut bad = choices.clone();
+    bad.groups[0].packages[0].package = "not-installed".into();
+    assert!(selection::validate(&bad, &inventory).is_err());
+    bad = choices.clone();
+    bad.groups[0].packages.pop();
+    assert!(selection::validate(&bad, &inventory).is_err());
+    assert!(selection::review(
+        &mut choices,
+        &mut std::io::Cursor::new(b""),
+        &mut Vec::new()
+    )
+    .is_err());
+}
+
+#[test]
+fn review_cli_saves_defaults_and_refuses_overwrite() {
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\n",
+        "firefox\nchromium\n",
+        "",
+    )
+    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("inventory.json");
+    let output_path = dir.path().join("choices.json");
+    fs::write(&input, serde_json::to_vec(&inventory).unwrap()).unwrap();
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_nixify"))
+            .arg("review")
+            .arg("--input")
+            .arg(&input)
+            .arg("--output")
+            .arg(&output_path)
+            .arg("--defaults")
+            .output()
+            .unwrap()
+    };
+    assert!(run().status.success());
+    let selection = nixify::selection::read(&output_path).unwrap();
+    assert!(selection.groups[0].packages.iter().all(|p| p.keep));
+    assert!(!run().status.success());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(output_path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+}
+
+#[test]
+fn explicit_choices_compose_with_evaluated_package_coverage() {
+    use nixify::{
+        coverage_eval::{Evidence, MatchEvidence},
+        draft, selection,
+    };
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\n",
+        "firefox\nchromium\n",
+        "",
+    )
+    .unwrap();
+    let revision = "0123456789abcdef0123456789abcdef01234567";
+    let count = mapping::decisions(&inventory)
+        .iter()
+        .filter_map(|d| d.nixpkgs_attribute.as_ref())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let evidence = Evidence {
+        schema_version: 1,
+        nixpkgs_revision: revision.into(),
+        system: "x86_64-linux".into(),
+        matched: [(
+            "firefox".into(),
+            MatchEvidence {
+                path: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-firefox".into(),
+                outputs: vec!["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-firefox".into()],
+                priority: 5,
+            },
+        )]
+        .into_iter()
+        .collect(),
+        candidate_count: count,
+        unavailable_candidates: 0,
+        unavailable_system_packages: 0,
+    };
+    let mut choices = selection::propose(&inventory);
+    choices.groups[0]
+        .packages
+        .iter_mut()
+        .find(|p| p.package == "chromium")
+        .unwrap()
+        .keep = false;
+    let temp = tempfile::tempdir().unwrap();
+    let dir = temp.path().join("draft");
+    output::generate_with_selection(
+        &inventory,
+        &dir,
+        revision,
+        &mapping::ReviewedMappings::empty(),
+        None,
+        &[],
+        Some(&evidence),
+        Some(&choices),
+    )
+    .unwrap();
+    let packages = fs::read_to_string(dir.join("packages.nix")).unwrap();
+    assert!(!packages.contains("pkgs.\"chromium\""));
+    assert!(!packages.contains("pkgs.\"firefox\""));
+    assert!(draft::expected_attributes(&dir, &inventory)
+        .unwrap()
+        .1
+        .is_empty());
+    let report = fs::read_to_string(dir.join("migration-report.md")).unwrap();
+    assert!(report.contains("explicitly excluded"));
+    assert!(report.contains("evaluated target system packages"));
+}
+
+#[test]
+fn generate_cli_uses_saved_application_selection() {
+    let inventory = manjaro::inventory(
+        "ID=manjaro",
+        "x86_64",
+        "firefox 1\nchromium 1\n",
+        "firefox\nchromium\n",
+        "",
+    )
+    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("inventory.json");
+    let choice_path = dir.path().join("selection.json");
+    let draft_path = dir.path().join("draft");
+    fs::write(&input, serde_json::to_vec(&inventory).unwrap()).unwrap();
+    let mut selection = nixify::selection::propose(&inventory);
+    selection.groups[0]
+        .packages
+        .iter_mut()
+        .find(|p| p.package == "chromium")
+        .unwrap()
+        .keep = false;
+    fs::write(&choice_path, serde_json::to_vec(&selection).unwrap()).unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_nixify"))
+        .args(["generate", "--input"])
+        .arg(&input)
+        .args(["--output"])
+        .arg(&draft_path)
+        .args(["--selection"])
+        .arg(&choice_path)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let packages = fs::read_to_string(draft_path.join("packages.nix")).unwrap();
+    assert!(packages.contains("pkgs.\"firefox\""));
+    assert!(!packages.contains("pkgs.\"chromium\""));
+    assert!(draft_path.join("package-selection.json").exists());
 }

@@ -188,7 +188,7 @@ pub fn inventory(
             ],
         })
         .collect();
-    Ok(Inventory { schema_version: 1, source: Source { distribution: id, architecture: architecture.into(), evidence: "/etc/os-release:ID".into() }, packages, service_scopes: Vec::new(), desktop: None, hardware: None, networking: None, warnings: vec!["Foreign means absent from configured sync databases; it does not establish AUR origin.".into(), "Hardware and network settings require manual migration review.".into()] })
+    Ok(Inventory { schema_version: 1, source: Source { distribution: id, architecture: architecture.into(), evidence: "/etc/os-release:ID".into() }, packages, package_groups: None, service_scopes: Vec::new(), desktop: None, hardware: None, networking: None, config_evidence: None, warnings: vec!["Foreign means absent from configured sync databases; it does not establish AUR origin.".into(), "Hardware and network settings require manual migration review.".into()] })
 }
 pub fn scan(requested: Option<&str>) -> Result<Inventory, ScanError> {
     let os = os_release()?;
@@ -208,6 +208,16 @@ pub fn scan(requested: Option<&str>) -> Result<Inventory, ScanError> {
     let explicit = run_bounded("pacman", &["-Qqe"], true)?;
     let foreign = run_bounded("pacman", &["-Qqm"], true)?;
     let mut inventory = inventory(&os, std::env::consts::ARCH, &all, &explicit, &foreign)?;
+    match run_bounded("pacman", &["-Qg"], true)
+        .map_err(|e| e.to_string())
+        .and_then(|text| crate::package_groups::parse(&text, &inventory))
+    {
+        Ok(groups) => inventory.package_groups = Some(groups),
+        Err(_) => inventory.warnings.push(
+            "Installed package groups unavailable or inconsistent; group membership is unknown."
+                .into(),
+        ),
+    }
     inventory.service_scopes = crate::systemd::scan();
     for scope in &inventory.service_scopes {
         if !scope.unit_files_available || !scope.runtime_available {
@@ -252,5 +262,6 @@ pub fn scan(requested: Option<&str>) -> Result<Inventory, ScanError> {
             .push("Resolver evidence unavailable; DNS configuration is unknown.".into());
     }
     inventory.networking = Some(network);
+    inventory.config_evidence = Some(crate::config_evidence::scan(&inventory));
     Ok(inventory)
 }

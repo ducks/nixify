@@ -19,6 +19,12 @@ pub struct Decision {
     pub status: Status,
     pub nixpkgs_attribute: Option<String>,
     pub reason: String,
+    /// A revision-scoped, evidence-backed reason to omit the direct entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub covered_by: Option<crate::coverage::Coverage>,
+    /// Explicitly excluded by the user's package selection.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub excluded_by_selection: bool,
 }
 /// Versioned, distro-specific data bundled into the binary for offline use.
 #[derive(Debug, Deserialize)]
@@ -209,6 +215,8 @@ pub fn decision(package: &Package) -> Decision {
         status,
         nixpkgs_attribute: attr,
         reason,
+        covered_by: None,
+        excluded_by_selection: false,
     }
 }
 pub fn decisions(inventory: &Inventory) -> Vec<Decision> {

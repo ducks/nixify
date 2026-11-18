@@ -20,6 +20,10 @@ Check the original package and target Nixpkgs attribute against their upstream s
 
 Run `cargo fmt --all -- --check`, `cargo test --locked`, `cargo clippy --all-targets --locked -- -D warnings`, and `python3 -m unittest discover -s tests -p 'test_enrich_candidates.py' -v`. Run `nix flake check` where Nix is available.
 
+## NixOS channel catalog
+
+For local matching against the NixOS Search package data, see `catalog-suggest` in the README. The catalog does not identify Manjaro-to-Nixpkgs equivalence on its own. Channel and revision must be chosen for the target; the source catalog revision is declared, not authenticated.
+
 ## Maintainer bulk candidate generation
 
 `scripts/generate_mapping_candidates.py` creates a distribution-wide review queue without users submitting inventories. Download a snapshot of the [AUR metadata archive](https://wiki.archlinux.org/title/Aurweb_RPC_interface#AUR_metadata_archives), or a Debian/Ubuntu `Packages` index, and independently obtain `nix search --json` output from a pinned Nixpkgs revision. Supply the full revision explicitly. This tool reads local files only and records input hashes; it does not authenticate those files or the revision.

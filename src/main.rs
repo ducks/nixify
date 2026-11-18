@@ -1,8 +1,11 @@
-use clap::{Parser, Subcommand};
-use nixify::{baseline, draft, inventory::Inventory, manjaro, mapping, output, suggest};
+use clap::{Parser, Subcommand, ValueEnum};
+use nixify::{
+    baseline, catalog, config_inspection, desktop::DesktopKind, draft, inventory::Inventory,
+    manjaro, mapping, output, suggest,
+};
 use std::{
     fs::{File, OpenOptions},
-    io::{Read, Write},
+    io::{IsTerminal, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -15,6 +18,32 @@ struct Cli {
     #[command(subcommand)]
     command: Command,
 }
+#[derive(Clone, Copy, ValueEnum)]
+enum DesktopSelection {
+    Hyprland,
+    Xfce,
+}
+#[derive(Clone, Copy, ValueEnum)]
+enum ConfigProfile {
+    Hyprland,
+    DockerDaemon,
+}
+impl From<ConfigProfile> for config_inspection::Profile {
+    fn from(value: ConfigProfile) -> Self {
+        match value {
+            ConfigProfile::Hyprland => Self::Hyprland,
+            ConfigProfile::DockerDaemon => Self::DockerDaemon,
+        }
+    }
+}
+impl From<DesktopSelection> for DesktopKind {
+    fn from(value: DesktopSelection) -> Self {
+        match value {
+            DesktopSelection::Hyprland => Self::Hyprland,
+            DesktopSelection::Xfce => Self::Xfce,
+        }
+    }
+}
 #[derive(Subcommand)]
 enum Command {
     /// Read-only Manjaro package inventory. No Nix installation is required.
@@ -23,6 +52,14 @@ enum Command {
         distro: Option<String>,
         #[arg(long)]
         output: Option<PathBuf>,
+    },
+    /// Capture hardware-only output from the installed NixOS configuration generator.
+    HardwareConfig {
+        #[arg(long)]
+        output: PathBuf,
+        /// Include currently mounted filesystems; review carefully for the intended target.
+        #[arg(long)]
+        include_filesystems: bool,
     },
     /// Generate a package module and migration report in a new directory.
     Generate {
@@ -33,9 +70,40 @@ enum Command {
         /// Full pinned Nixpkgs Git revision (defaults to nixify's locked revision).
         #[arg(long)]
         nixpkgs_rev: Option<String>,
+        /// Evaluate a trusted local checkout matching the target revision for exact package overlap.
+        #[arg(long)]
+        nixpkgs: Option<PathBuf>,
         /// Explicitly reviewed mappings in JSON; never inferred automatically.
         #[arg(long)]
         reviewed_mappings: Option<PathBuf>,
+        /// Apply choices saved by the review command.
+        #[arg(long)]
+        selection: Option<PathBuf>,
+        /// Explicitly choose a desktop to enable; detection alone remains a hint.
+        #[arg(long, value_enum)]
+        desktop: Option<DesktopSelection>,
+        /// Include sanitized, explicitly generated configuration inspection(s).
+        #[arg(long)]
+        config_inspection: Vec<PathBuf>,
+    },
+    /// Review ambiguous application roles and save explicit package selections.
+    Review {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+        /// Save the conservative defaults without prompting.
+        #[arg(long)]
+        defaults: bool,
+    },
+    /// Inspect an explicitly selected configuration file using a supported profile.
+    InspectConfig {
+        #[arg(long, value_enum)]
+        profile: ConfigProfile,
+        #[arg(long)]
+        file: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
     },
     /// Check Nix syntax without resolving inputs, building, or activating.
     Validate {
@@ -63,6 +131,18 @@ enum Command {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Suggest matches using an existing Nixpkgs packages.json catalog.
+    CatalogSuggest {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        catalog: PathBuf,
+        /// Full Nixpkgs revision associated with the catalog (not authenticated).
+        #[arg(long)]
+        revision: String,
+        #[arg(long)]
+        output: PathBuf,
+    },
     /// Explain curated mapping coverage and unresolved packages.
     Report {
         #[arg(long)]
@@ -87,8 +167,99 @@ fn read_inventory(path: &Path) -> Result<Inventory, Box<dyn std::error::Error>> 
     inventory.validate().map_err(std::io::Error::other)?;
     Ok(inventory)
 }
+// Unlike std's printing macros, these propagate a closed stdout pipe as an
+// ordinary I/O error so commands like `nixify report ... | head` work cleanly.
+macro_rules! println {
+    ($($arg:tt)*) => { writeln!(std::io::stdout().lock(), $($arg)*)? };
+}
+macro_rules! print {
+    ($($arg:tt)*) => { write!(std::io::stdout().lock(), $($arg)*)? };
+}
+
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     match Cli::parse().command {
+        Command::Review {
+            input,
+            output,
+            defaults,
+        } => {
+            let inventory = read_inventory(&input)?;
+            match std::fs::symlink_metadata(&output) {
+                Ok(_) => return Err(format!("output already exists: {}", output.display()).into()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            let mut selection = nixify::selection::propose(&inventory);
+            if !defaults && !selection.groups.is_empty() {
+                eprintln!(
+                    "Only recognized ambiguous roles are shown; other packages remain unchanged."
+                );
+                let stdin = std::io::stdin();
+                if !stdin.is_terminal() {
+                    return Err("interactive review requires a terminal; use --defaults to save conservative choices".into());
+                }
+                nixify::selection::review(
+                    &mut selection,
+                    &mut stdin.lock(),
+                    &mut std::io::stdout().lock(),
+                )
+                .map_err(std::io::Error::other)?;
+            }
+            #[cfg(unix)]
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            options
+                .open(&output)?
+                .write_all((serde_json::to_string_pretty(&selection)? + "\n").as_bytes())?;
+            eprintln!(
+                "Saved {} review groups to {}. Pass --selection to generate.",
+                selection.groups.len(),
+                output.display()
+            );
+        }
+        Command::HardwareConfig {
+            output,
+            include_filesystems,
+        } => {
+            let config = nixify::hardware::generate_config_with(include_filesystems, |program, args| {
+                manjaro::run_bounded(program, args, false).map_err(|error| {
+                    format!("hardware generation failed: {error}; install nixos-generate-config from nixos-install-tools and ensure it is on PATH")
+                })
+            }).map_err(std::io::Error::other)?;
+            #[cfg(unix)]
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            options.open(&output)?.write_all(config.as_bytes())?;
+            eprintln!("Wrote hardware suggestions to {}. Review before use; filesystem settings may describe the source machine, not the intended target.", output.display());
+        }
+        Command::CatalogSuggest {
+            input,
+            catalog: source,
+            revision,
+            output,
+        } => {
+            let inventory = read_inventory(&input)?;
+            let report =
+                catalog::read(&inventory, &source, &revision).map_err(std::io::Error::other)?;
+            let data = serde_json::to_string_pretty(&report)? + "\n";
+            #[cfg(unix)]
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            options.open(&output)?.write_all(data.as_bytes())?;
+            eprintln!(
+                "Wrote unreviewed catalog candidates to {}",
+                output.display()
+            );
+        }
         Command::Scan {
             distro,
             output: destination,
@@ -113,7 +284,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             input,
             output: dir,
             nixpkgs_rev,
+            nixpkgs,
             reviewed_mappings,
+            selection,
+            desktop,
+            config_inspection: inspection_paths,
         } => {
             let inventory = read_inventory(&input)?;
             let revision = match nixpkgs_rev {
@@ -124,8 +299,73 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 Some(path) => mapping::read_reviewed(&path).map_err(std::io::Error::other)?,
                 None => mapping::ReviewedMappings::empty(),
             };
-            output::generate_with_review(&inventory, &dir, &revision, &reviewed)?;
+            let mut inspections = Vec::new();
+            for path in inspection_paths {
+                let text =
+                    config_inspection::read_explicit(&path).map_err(std::io::Error::other)?;
+                let inspection: config_inspection::Inspection = serde_json::from_str(&text)?;
+                inspection.validate().map_err(std::io::Error::other)?;
+                inspections.push(inspection);
+            }
+            let selected = desktop.map(Into::into);
+            let selection = selection
+                .as_deref()
+                .map(nixify::selection::read)
+                .transpose()
+                .map_err(std::io::Error::other)?;
+            if let Some(selection) = &selection {
+                nixify::selection::validate(selection, &inventory)
+                    .map_err(std::io::Error::other)?;
+            }
+            let revision = draft::normalize_revision(&revision).map_err(std::io::Error::other)?;
+            let evidence = if let Some(checkout) = nixpkgs {
+                if dir.try_exists()? {
+                    return Err(format!("output already exists: {}", dir.display()).into());
+                }
+                eprintln!("Evaluating trusted Nixpkgs checkout for target package overlap...");
+                Some(
+                    nixify::coverage_eval::evaluate(
+                        &inventory,
+                        &revision,
+                        &reviewed,
+                        selected,
+                        &inspections,
+                        &checkout,
+                    )
+                    .map_err(std::io::Error::other)?,
+                )
+            } else {
+                None
+            };
+            output::generate_with_selection(
+                &inventory,
+                &dir,
+                &revision,
+                &reviewed,
+                selected,
+                &inspections,
+                evidence.as_ref(),
+                selection.as_ref(),
+            )?;
             eprintln!("Wrote migration draft to {}", dir.display());
+        }
+        Command::InspectConfig {
+            profile,
+            file,
+            output,
+        } => {
+            let content = config_inspection::read_explicit(&file).map_err(std::io::Error::other)?;
+            let inspection = config_inspection::inspect(profile.into(), &content)
+                .map_err(std::io::Error::other)?;
+            let data = serde_json::to_string_pretty(&inspection)? + "\n";
+            #[cfg(unix)]
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            options.open(&output)?.write_all(data.as_bytes())?;
+            eprintln!("Wrote sanitized inspection to {}", output.display());
         }
         Command::Validate {
             directory,
@@ -280,6 +520,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 fn main() {
     if let Err(e) = run() {
+        if e.downcast_ref::<std::io::Error>()
+            .is_some_and(|error| error.kind() == std::io::ErrorKind::BrokenPipe)
+        {
+            return;
+        }
         eprintln!("nixify: {e}");
         std::process::exit(1);
     }

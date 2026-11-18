@@ -15,6 +15,7 @@ use std::{
 pub fn packages_nix(decisions: &[Decision]) -> String {
     let attrs: BTreeSet<_> = decisions
         .iter()
+        .filter(|d| d.covered_by.is_none() && !d.excluded_by_selection)
         .filter_map(|d| d.nixpkgs_attribute.as_deref())
         .collect();
     let mut out = String::from("# Migration draft. Package mappings are not yet validated against a Nixpkgs revision.\n{ pkgs, ... }:\n{\n  environment.systemPackages = with pkgs; [\n");
@@ -51,17 +52,53 @@ pub fn services_nix(decisions: &[ServiceDecision]) -> String {
     out
 }
 
+pub(crate) fn services_nix_with_inspections(
+    decisions: &[ServiceDecision],
+    inspections: &[crate::config_inspection::Inspection],
+) -> String {
+    let mut services = services_nix(decisions);
+    if decisions
+        .iter()
+        .any(|d| d.nixos_option == Some("virtualisation.docker.enable"))
+    {
+        for inspection in inspections {
+            for setting in &inspection.settings {
+                if let crate::config_inspection::Setting::DockerLiveRestore(value) = setting {
+                    let setting = format!("  virtualisation.docker.daemon.settings.\"live-restore\" = {value}; # inspected\n");
+                    services.insert_str(services.len() - 2, &setting);
+                }
+            }
+        }
+    }
+    services
+}
+
 pub fn desktop_nix(inventory: &Inventory) -> String {
-    let mut out = String::from("# Suggestions only: confirm the intended desktop and target NixOS options before enabling.\n{ ... }:\n{\n");
-    let options: BTreeSet<_> = inventory
+    desktop_nix_with_selection(inventory, None)
+}
+
+pub fn desktop_nix_with_selection(
+    inventory: &Inventory,
+    selected: Option<desktop::DesktopKind>,
+) -> String {
+    let mut out = String::from(
+        "# Migration draft: review desktop options and target revision.\n{ ... }:\n{\n",
+    );
+    let mut options: BTreeSet<_> = inventory
         .desktop
         .as_ref()
         .into_iter()
         .flat_map(|desktop| desktop.candidates.iter())
         .filter_map(|candidate| desktop::suggested_option(candidate.kind))
         .collect();
+    let selected_option = selected.and_then(desktop::suggested_option);
+    options.extend(selected_option);
     for option in options {
-        let _ = writeln!(out, "  # {option} = true;");
+        if Some(option) == selected_option {
+            let _ = writeln!(out, "  {option} = true; # explicitly selected");
+        } else {
+            let _ = writeln!(out, "  # {option} = true;");
+        }
     }
     out.push_str("}\n");
     out
@@ -86,6 +123,61 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         .filter(|p| p.explicitly_installed)
         .count();
     let mut out = format!("# nixify migration report\n\nSource: Manjaro Linux ({})\n\n## Packages\n\n- Explicitly installed: {explicit}\n- Curated mappings (not revision-validated): {}\n- User-reviewed mappings (not automatically verified): {}\n- Inferred mappings (same name and upstream homepage; review): {}\n- Require review: {}\n- No mapping: {}\n- Dependency-installed, not selected: {}\n\n", inventory.source.architecture, count(Status::Mapped), count(Status::Reviewed), count(Status::Inferred), count(Status::Review), count(Status::Unmapped), count(Status::Dependency));
+    let covered = decisions.iter().filter(|d| d.covered_by.is_some()).count();
+    if covered > 0 {
+        let _ = writeln!(out, "- Direct package entries omitted as already supplied by generated NixOS configuration: {covered}. Review these if you change the providing module or default packages.\n");
+    }
+    let excluded = decisions.iter().filter(|d| d.excluded_by_selection).count();
+    if excluded > 0 {
+        let _ = writeln!(out, "- Source packages explicitly excluded from direct entries: {excluded}. Other packages or enabled modules may still provide them.\n");
+    }
+    if let Some(groups) = &inventory.package_groups {
+        out.push_str("## Installed package groups\n\nSource: `pacman -Qg`. Groups may overlap; membership does not show who installed a package, whether it is used, or whether the whole group should migrate. Dependencies are not listed here. These are review hints and do not change the generated configuration.\n\n");
+        let mut groups: Vec<_> = groups.iter().collect();
+        groups.sort_by(|a, b| a.name.cmp(&b.name));
+        let by_name: std::collections::BTreeMap<_, _> =
+            decisions.iter().map(|d| (d.package.as_str(), d)).collect();
+        for group in groups {
+            let mut members: Vec<_> = group
+                .packages
+                .iter()
+                .filter_map(|name| by_name.get(name.as_str()).copied())
+                .filter(|d| d.status != Status::Dependency)
+                .collect();
+            members.sort_by(|a, b| a.package.cmp(&b.package));
+            if members.is_empty() {
+                continue;
+            }
+            let proposed = members
+                .iter()
+                .filter(|d| {
+                    d.nixpkgs_attribute.is_some()
+                        && d.covered_by.is_none()
+                        && !d.excluded_by_selection
+                })
+                .count();
+            let _ = writeln!(
+                out,
+                "### `{}` — {} explicit, {} direct entries proposed\n",
+                group.name,
+                members.len(),
+                proposed
+            );
+            for d in members {
+                let state = if d.excluded_by_selection {
+                    "direct entry excluded by user selection"
+                } else if d.covered_by.is_some() {
+                    "provided by target configuration"
+                } else if d.nixpkgs_attribute.is_some() {
+                    "direct entry proposed"
+                } else {
+                    "requires review"
+                };
+                let _ = writeln!(out, "- `{}` — {}", d.package, state);
+            }
+            out.push('\n');
+        }
+    }
     out.push_str("## Package decisions\n\n");
     for d in decisions.iter().filter(|d| d.status != Status::Dependency) {
         let _ = writeln!(
@@ -98,6 +190,12 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
                 .map(|a| format!(" Proposed attribute: `{a}`."))
                 .unwrap_or_default()
         );
+        if let Some(coverage) = &d.covered_by {
+            let _ = writeln!(out, "  Direct entry omitted: `{}` supplies it at Nixpkgs revision `{}`. Recheck if you change the providing configuration; another source mapping may still include the same attribute.", coverage.provider, coverage.nixpkgs_revision);
+        }
+        if d.excluded_by_selection {
+            out.push_str("  Direct entry excluded by explicit selection. Another package or enabled module may still provide it.\n");
+        }
     }
     out.push_str("\n## Services\n\n");
     if inventory.service_scopes.is_empty() {
@@ -156,7 +254,7 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
     } else {
         let _ = writeln!(out, "Recognized enabled display-manager services: {:?}; confirm their configuration manually.", managers);
     }
-    out.push_str("Desktop module options in desktop.nix are commented suggestions only. Verify the target NixOS revision and select the intended desktop and display manager.\n");
+    out.push_str("Desktop evidence does not establish a system default. Inspect desktop.nix for explicitly selected options; verify the target NixOS revision and choose a display manager.\n");
     out.push_str("\n## Hardware and filesystems (planning evidence)\n\n");
     if let Some(hardware) = &inventory.hardware {
         let _ = writeln!(
@@ -244,7 +342,29 @@ pub fn report(inventory: &Inventory, decisions: &[Decision]) -> String {
         out.push_str("Network manager service state is unknown.\n");
     }
     out.push_str("Hostname, interface configuration, DNS addresses, VPNs and effective firewall rules require manual review.\n");
-    out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop hints do not establish your configured default; verify hardware, networking, filesystems, and boot configuration separately.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Inferred matches include some foreign packages; foreign status does not establish AUR provenance. Review inferred packages together in packages.nix and this report.\n");
+    out.push_str("\n## Configuration locations\n\n");
+    if let Some(entries) = &inventory.config_evidence {
+        out.push_str("Only known locations for installed packages were checked. File contents were not read or copied; a present file may contain defaults, and a missing file does not establish that no configuration exists. User locations refer to the scanning account.\n\n");
+        for entry in entries {
+            let state = match entry.state {
+                crate::config_evidence::ConfigState::Present => {
+                    "file present; inspect and migrate manually"
+                }
+                crate::config_evidence::ConfigState::Missing => "not found at this location",
+                crate::config_evidence::ConfigState::SymlinkNotFollowed => {
+                    "symlink encountered; inspect manually"
+                }
+                crate::config_evidence::ConfigState::OtherType => {
+                    "unexpected file type; inspect manually"
+                }
+                crate::config_evidence::ConfigState::Unavailable => "unavailable; state unknown",
+            };
+            let _ = writeln!(out, "- `{}`: {}.", entry.id.label(), state);
+        }
+    } else {
+        out.push_str("Configuration locations were not scanned in this inventory.\n");
+    }
+    out.push_str("\n## Manual migration requirements\n\n- Verify each proposed Nixpkgs attribute against the revision you intend to use.\n- Review package licenses and Nixpkgs policy: some packages may require explicit unfree-package permission before a build will evaluate. Attribute and partial module checks do not establish buildability. Choose and configure your own policy; this draft does not enable unfree packages.\n- Review all service configuration and data; enablement is not equivalent to a complete migration. Desktop hints do not establish your configured default; verify hardware, networking, filesystems, and boot configuration separately.\n- Generate hardware configuration using NixOS installation tooling; this draft is not bootable or installable by itself.\n- Inferred matches include some foreign packages; foreign status does not establish AUR provenance. Review inferred packages together in packages.nix and this report.\n");
     out
 }
 fn create_file(path: &Path, data: &str) -> io::Result<()> {
@@ -279,12 +399,100 @@ pub fn generate_with_review(
     revision: &str,
     review: &mapping::ReviewedMappings,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_desktop(inventory, dir, revision, review, None)
+}
+
+pub fn generate_with_desktop(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+    selected: Option<desktop::DesktopKind>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_inspections(inventory, dir, revision, review, selected, &[])
+}
+
+pub fn generate_with_inspections(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+    selected: Option<desktop::DesktopKind>,
+    inspections: &[crate::config_inspection::Inspection],
+) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_coverage(
+        inventory,
+        dir,
+        revision,
+        review,
+        selected,
+        inspections,
+        None,
+    )
+}
+
+pub fn generate_with_coverage(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+    selected: Option<desktop::DesktopKind>,
+    inspections: &[crate::config_inspection::Inspection],
+    evaluated: Option<&crate::coverage_eval::Evidence>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    generate_with_selection(
+        inventory,
+        dir,
+        revision,
+        review,
+        selected,
+        inspections,
+        evaluated,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn generate_with_selection(
+    inventory: &Inventory,
+    dir: &Path,
+    revision: &str,
+    review: &mapping::ReviewedMappings,
+    selected: Option<desktop::DesktopKind>,
+    inspections: &[crate::config_inspection::Inspection],
+    evaluated: Option<&crate::coverage_eval::Evidence>,
+    selection: Option<&crate::selection::Selection>,
+) -> Result<(), Box<dyn std::error::Error>> {
     inventory.validate().map_err(io::Error::other)?;
+    for (index, inspection) in inspections.iter().enumerate() {
+        inspection.validate().map_err(io::Error::other)?;
+        if inspections[..index]
+            .iter()
+            .any(|other| other.profile == inspection.profile)
+        {
+            return Err(io::Error::other("duplicate configuration inspection profile").into());
+        }
+    }
+    if selected.is_some_and(|kind| desktop::suggested_option(kind).is_none()) {
+        return Err(io::Error::other("unsupported desktop selection").into());
+    }
     let flake =
         crate::draft::flake(&inventory.source.architecture, revision).map_err(io::Error::other)?;
     let revision = crate::draft::normalize_revision(revision).map_err(io::Error::other)?;
-    let decisions = mapping::reviewed_decisions(inventory, review, Some(&revision))
+    let mut decisions = mapping::reviewed_decisions(inventory, review, Some(&revision))
         .map_err(io::Error::other)?;
+    crate::coverage::apply(inventory, &mut decisions, &revision, selected);
+    if let Some(evidence) = evaluated {
+        // Evaluated signatures supersede the assumptions in offline rules.
+        for decision in &mut decisions {
+            decision.covered_by = None;
+        }
+        crate::coverage_eval::apply(inventory, &mut decisions, evidence, &revision)
+            .map_err(io::Error::other)?;
+    }
+    if let Some(selection) = selection {
+        crate::selection::apply(selection, inventory, &mut decisions).map_err(io::Error::other)?;
+    }
     // Never overwrite a previous output, including partially generated drafts.
     fs::create_dir(dir)?;
     create_file(&dir.join("flake.nix"), &flake)?;
@@ -297,11 +505,28 @@ pub fn generate_with_review(
         &dir.join("package-decisions.json"),
         &(serde_json::to_string_pretty(&decisions)? + "\n"),
     )?;
+    if let Some(evidence) = evaluated {
+        create_file(
+            &dir.join("coverage-evaluation.json"),
+            &(serde_json::to_string_pretty(evidence)? + "\n"),
+        )?;
+    }
+    if let Some(selection) = selection {
+        create_file(
+            &dir.join("package-selection.json"),
+            &(serde_json::to_string_pretty(selection)? + "\n"),
+        )?;
+    }
+    let service_decisions = service_mapping::decisions(inventory);
+    let services = services_nix_with_inspections(&service_decisions, inspections);
+    let docker_enabled = service_decisions
+        .iter()
+        .any(|d| d.nixos_option == Some("virtualisation.docker.enable"));
+    create_file(&dir.join("services.nix"), &services)?;
     create_file(
-        &dir.join("services.nix"),
-        &services_nix(&service_mapping::decisions(inventory)),
+        &dir.join("desktop.nix"),
+        &desktop_nix_with_selection(inventory, selected),
     )?;
-    create_file(&dir.join("desktop.nix"), &desktop_nix(inventory))?;
     if !review.mappings.is_empty() {
         let mut review = review.clone();
         review
@@ -312,12 +537,46 @@ pub fn generate_with_review(
             &(serde_json::to_string_pretty(&review)? + "\n"),
         )?;
     }
+    let mut inspection_report = String::new();
+    if let Some(evidence) = evaluated {
+        let _ = writeln!(inspection_report, "\n## Evaluated target coverage\n\n- Compared {} attributes with generated target system package outputs on {}.\n- {} attributes matched; {} candidates and {} system packages could not be evaluated. Unmatched or unavailable entries remain subject to normal mapping rules.\n- Checkout revision metadata is self-reported, and this is an evaluation with placeholder hardware, not a build or proof of behavioral equivalence. The saved evidence is not authenticated.\n", evidence.candidate_count, evidence.system, evidence.matched.len(), evidence.unavailable_candidates, evidence.unavailable_system_packages);
+    }
+    if !inspections.is_empty() {
+        inspection_report.push_str("\n## Explicit configuration inspections\n\nOnly allowlisted settings are retained. Other content was omitted; inspect the original files before migration. Hyprland findings are review-only and not applied.\n\n");
+        for inspection in inspections {
+            let _ = writeln!(
+                inspection_report,
+                "- {:?}: {} omitted directives/settings; incomplete: {}; retained: {:?}.",
+                inspection.profile,
+                inspection.unhandled_items,
+                inspection.incomplete,
+                inspection.settings
+            );
+        }
+        if !docker_enabled
+            && inspections
+                .iter()
+                .any(|i| i.profile == crate::config_inspection::Profile::DockerDaemon)
+        {
+            inspection_report.push_str("Docker settings were not applied because the Docker service was not persistently enabled in the inventory.\n");
+        }
+        create_file(
+            &dir.join("configuration-inspections.json"),
+            &(serde_json::to_string_pretty(inspections)? + "\n"),
+        )?;
+    }
     create_file(
         &dir.join("migration-report.md"),
-        &format!("{}\n## Target draft\n\n- Nixpkgs revision: `{}` (not yet resolved or validated).\n- No flake.lock was generated.\n- Supply reviewed hardware, boot, filesystems, users, networking and system.stateVersion before use.\n", report(inventory, &decisions), revision),
+        &format!("{}{}\n## Target draft\n\n- Nixpkgs revision: `{}` (not yet resolved or validated).\n- Explicit desktop selection: {}.\n- No flake.lock was generated.\n- Supply reviewed hardware, boot, filesystems, users, networking and system.stateVersion before use.\n", report(inventory, &decisions), inspection_report, revision, selected.map(|kind| format!("{kind:?}")).unwrap_or_else(|| "none".into())),
     )?;
     let mut sorted = inventory.clone();
     sorted.packages.sort_by(|a, b| a.name.cmp(&b.name));
+    if let Some(groups) = &mut sorted.package_groups {
+        groups.sort_by(|a, b| a.name.cmp(&b.name));
+        for group in groups {
+            group.packages.sort();
+        }
+    }
     sorted.service_scopes.sort_by_key(|s| s.scope);
     for scope in &mut sorted.service_scopes {
         scope.services.sort_by(|a, b| a.name.cmp(&b.name));

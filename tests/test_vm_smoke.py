@@ -19,6 +19,17 @@ class ConsoleDetectionTest(unittest.TestCase):
         self.assertFalse(vm_smoke.test_done(b"printf 'NIXIFY_VM_TEST_DONE\\n'; poweroff\r\n"))
         self.assertTrue(vm_smoke.test_done(b"\r\nNIXIFY_VM_TEST_DONE\r\n"))
 
+    def test_expected_commands_require_actual_console_markers(self):
+        console = b'for cmd in Hyprland; do echo NIXIFY_COMMAND_$cmd=present; done\r\nNIXIFY_COMMAND_Hyprland=present\r\n'
+        self.assertEqual(vm_smoke.missing_commands(console, ["Hyprland"]), [])
+        self.assertEqual(vm_smoke.missing_commands(console, ["nvim"]), ["nvim"])
+
+    def test_command_names_cannot_contain_shell_syntax_or_paths(self):
+        for value in ["sh;touch", "../bin/sh", "$(id)", "-n", ""]:
+            with self.subTest(value=value), self.assertRaises(Exception):
+                vm_smoke.command_name(value)
+        self.assertEqual(vm_smoke.command_name("Hyprland"), "Hyprland")
+
 
 if __name__ == "__main__":
     unittest.main()

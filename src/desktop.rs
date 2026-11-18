@@ -173,6 +173,7 @@ pub fn enabled_display_managers(inventory: &Inventory) -> Vec<&'static str> {
             ("sddm.service", "SDDM"),
             ("gdm.service", "GDM"),
             ("lightdm.service", "LightDM"),
+            ("lemurs.service", "Lemurs"),
         ] {
             if scope
                 .services

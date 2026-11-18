@@ -1,5 +1,22 @@
 use crate::manjaro::run_bounded;
 use serde::{Deserialize, Serialize};
+
+/// Capture NixOS's hardware-only stdout without asking it to write system files.
+pub fn generate_config_with<F>(include_filesystems: bool, mut run: F) -> Result<String, String>
+where
+    F: FnMut(&str, &[&str]) -> Result<String, String>,
+{
+    let args: &[&str] = if include_filesystems {
+        &["--show-hardware-config"]
+    } else {
+        &["--show-hardware-config", "--no-filesystems"]
+    };
+    let config = run("nixos-generate-config", args)?;
+    if config.trim().is_empty() {
+        return Err("nixos-generate-config returned no hardware configuration".into());
+    }
+    Ok(config)
+}
 use std::{fs::File, io::Read, path::Path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

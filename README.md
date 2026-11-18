@@ -17,9 +17,96 @@ nixify validate ./nixos-migration
 
 `scan` reads `/etc/os-release`, calls `pacman -Q`, `-Qqe`, and `-Qqm`, and queries system and user systemd scopes for unit-file and running states. It does not alter the package database or systemd configuration. If a systemd scope is inaccessible, its state is explicitly unknown. It collects package names, versions and install reasons. “Explicit” is a pacman database flag, **not a count of packages you personally installed**: an installer or setup tool may have marked packages explicit. “Foreign” means absent from configured sync databases, not necessarily AUR.
 
+The scanner also queries installed package groups using `pacman -Qg`. Reports
+group explicitly installed members for review, including groups unrelated to
+desktops. Groups can overlap, and membership does not prove that the group was
+installed together, is currently used, or should migrate. This is review
+evidence only: the current generator does not apply group-level selections or
+remove packages based on group membership. If the query fails or disagrees
+with the package snapshot, group membership is unknown and a warning is saved.
+
+### Review application choices
+
+To review a small set of ambiguous application roles before generation:
+
+```sh
+nixify review --input inventory.json --output package-selection.json
+nixify generate --input inventory.json --output ./nixos-migration \
+  --selection package-selection.json
+```
+
+The review groups known, explicitly installed browsers, code editors, terminal
+emulators, and file managers only when more than one is present. It uses a
+small curated list of Manjaro package names, not process history or desktop
+metadata. All options start selected: press Enter to keep all, enter numbers
+such as `1,2` to keep several, or enter `none` to exclude the group from direct
+package entries. Unrecognized and unambiguous packages are unchanged. This
+does not infer which programs you use and does not remove packages from the
+source machine. An excluded package may still be supplied by another package
+or an enabled NixOS module.
+
+The selection is saved separately and copied into the draft; the report lists
+explicitly excluded source packages. It is tied to the inventory's recognized
+review groups: if the inventory changes, run review again. For noninteractive
+use, `nixify review --input inventory.json --output package-selection.json
+--defaults` saves the conservative keep-all selection, which can be inspected
+and edited before generation. Selection files reveal installed software and
+are created with owner-only permissions on Unix. Existing files are never
+overwritten.
+
 Generated `packages.nix` includes explicitly installed packages with curated mappings and inferred matches whose source and Nixpkgs catalog entries share a name and upstream homepage. The report labels inferred entries and their limitations, including when a foreign package happens to match AUR. Same-project packages may still differ, and foreign status does not prove AUR provenance. Dependencies are not promoted to direct packages; weak and unmapped matches remain in the report. Target revision, package features, platform support and behavior still need checking. Package mappings do not configure login shells, services, graphical sessions or application data. Output directories and inventory files must not exist already: existing work is never overwritten.
 
-`services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. Service names and status are included in the inventory and may reveal sensitive information.
+Some mapped packages may be classified as unfree by the selected Nixpkgs
+revision. Attribute-existence and partial module checks do not guarantee a
+system build will evaluate successfully. Review package licenses and configure
+your own Nixpkgs policy where needed; nixify does not enable unfree packages.
+
+For two explicitly checked Nixpkgs revisions on x86_64, generation omits
+Docker and NetworkManager direct entries when their generated modules supply
+them. The checked 24.11 revision also supports this for explicitly selected
+Hyprland. Base-system entries are kept offline: some share a store path but
+have a different link priority. Each omission and its provider appear in `migration-report.md` and
+`package-decisions.json`. This does not prove the source and target software
+behave identically. If you disable a providing module, override its package,
+or change NixOS default packages, review the affected entries and add them
+back if needed. Foreign packages and explicit `--reviewed-mappings` overrides
+are never omitted by these rules. Other revisions and architectures keep the
+direct entries; no Nix installation or network access is required to generate.
+The initial rules remove only a small fraction of distribution-provided
+packages; the rest still need review. Older drafts that omitted base packages
+under the previous offline rules must be regenerated for attribute validation.
+For drafts with omissions, the optional
+attribute check also requires the generated configuration, service, and desktop
+modules to remain unchanged; if they were edited, it stops and asks for review.
+Syntax validation remains available for edited drafts.
+
+To detect additional packages supplied by the actual generated base, service,
+and desktop modules, opt in to evaluating a **trusted** local checkout matching
+the target revision:
+
+```sh
+nixify generate --input inventory.json --output ./nixos-migration \
+  --nixpkgs-rev <full-commit> --nixpkgs /path/to/nixpkgs --desktop hyprland
+```
+
+This evaluates a temporary copy of the generated modules with an empty package
+list and placeholder hardware, then compares Nix output store paths, installed
+outputs, and link priorities for proposed attributes against
+`environment.systemPackages`. It does not build or
+activate anything. Matches are saved in `coverage-evaluation.json` and the
+report; packages whose identities cannot be evaluated remain subject to the
+ordinary offline rules. Foreign packages and user-reviewed mappings are kept.
+Evaluated matches replace the bundled offline overlap rules for that draft. The
+checkout's `.git-revision` must match the target pin, but that file and the
+saved evidence are self-reported and are not proof of checkout contents. Nix
+evaluation can execute code from the checkout and access local files, so only
+use a checkout you trust. Changing providers, Nixpkgs configuration, package
+overrides, or target modules requires re-evaluation. Attribute validation checks
+that saved evidence is consistent with the generated files; it does not rerun
+the comparison or authenticate the evidence. This does not prove source-package
+equivalence or cover every dependency in the target closure.
+
+`services.nix` proposes a small allowlist of NixOS module enablements only for persistently enabled system services. It never translates user services or treats a running service as evidence of persistent enablement. Review each service's configuration, data, credentials, security settings, and target options; enablement alone does not preserve behavior. The allowlist includes Bluetooth, printing, Avahi, libvirt, TLP, Ollama and Mullvad. On the checked Nixpkgs revision, Mullvad changes reverse-path firewall checking to loose; review target-specific effects before use. Service names and status are included in the inventory and may reveal sensitive information.
 
 
 The generated flake pins the Nixpkgs commit used by nixify's own flake lock by default. To use a different full 40-character commit, pass `--nixpkgs-rev <commit>` to `generate`. No `flake.lock` is created until inputs are explicitly resolved. Supply reviewed hardware configuration, bootloader, filesystems, users, networking and an appropriate `system.stateVersion` before any installation. The `nixify validate` command requires Nix and checks syntax. Optionally use `nixify validate ./nixos-migration --nixpkgs /path/to/nixpkgs` to check the generated package attributes against a local checkout. The attribute check compares the generated flake, packages module, inventory and saved package decisions; it reports if the checkout's `.git-revision` differs from the target pin or is unavailable. A matching file is self-reported metadata, not authenticated checkout content. The check does not establish package equivalence, build, boot or activate a system.
@@ -28,15 +115,78 @@ For trusted drafts and Nixpkgs checkouts, `nixify validate ./nixos-migration --n
 
 `desktop.nix` contains commented suggestions for recognized desktop packages,
 session files and process session hints. No desktop or display manager is
-selected automatically. Installed packages and available sessions do not prove
-which desktop is configured by default; confirm the options for your target
-NixOS version before enabling one.
+selected automatically. To choose one explicitly, add `--desktop hyprland` or
+`--desktop xfce` to `nixify generate`. This enables the selected NixOS module
+in the draft; it does not migrate desktop configuration, configure a login
+manager, or prove a graphical session will work. For example:
+
+```sh
+nixify generate --input inventory.json --output ./nixos-migration --desktop hyprland
+```
+
+Installed packages and session hints do not establish the system default.
+The report recognizes enabled Lemurs, but does not generate its configuration.
+Confirm desktop and display-manager options for your target NixOS revision.
 
 Hardware discovery uses `/proc/cpuinfo`, EFI interface presence, `lspci`, and
 `lsblk` for planning evidence. Absence of the EFI interface is reported as
 unknown, not BIOS; loop devices are omitted. No partition, filesystem or boot
 configuration is generated. USB devices, fstab, Wi-Fi settings and detailed hardware
 configuration are not scanned yet. Review the inventory before sharing it. Network inventory records interface-type counts, resolver categories and installed firewall package names; it does not retain interface names, addresses, DNS search domains, hostname or credentials. These summaries can still reveal aspects of your network or security posture.
+
+## Optional NixOS hardware suggestions
+
+If `nixos-generate-config` from `nixos-install-tools` is available on `PATH`,
+nixify can capture its hardware-only output without asking it to write into
+`/etc/nixos`:
+
+```sh
+nixify hardware-config --output hardware-configuration.nix
+```
+
+This optional command invokes `nixos-generate-config --show-hardware-config
+--no-filesystems`; normal scanning and generation still work without Nix. The
+new file is owner-only and never overwrites an existing file. Review it before
+copying or importing it into the generated draft; nixify does not import it
+automatically. Hardware suggestions may contain machine-identifying information.
+
+`--include-filesystems` omits `--no-filesystems` and may include identifiers and
+mounts for the **currently running source system**. Those are not necessarily
+the intended NixOS target. This does not detect a future partition layout,
+install NixOS, or establish that the generated system will boot.
+
+## Configuration locations
+
+The report identifies selected configuration locations for installed packages, including SSH, Docker, Lemurs, Hyprland, Waybar, Kitty, Neovim and Zsh. It checks metadata only and does not copy or interpret file contents. User locations refer to the scanning account’s `$HOME`; alternate locations and other users are not scanned. A symlink is reported without following it, and a missing file does not prove that the application has no configuration. Existing inventories without this field remain usable.
+
+## Optional configuration inspection
+
+File-content inspection is opt-in. Choose a profile and a specific regular file;
+`inspect-config` never modifies the source, rejects final symlinks and files over
+256 KiB, and creates a new owner-only JSON file. No raw file paths or contents are
+stored. The profile determines which typed settings can be retained; all other
+items are counted but omitted. The initial profiles are `hyprland` and
+`docker-daemon`.
+
+```sh
+nixify inspect-config --profile hyprland --file ~/.config/hypr/hyprland.conf --output hypr-inspection.json
+nixify generate --input inventory.json --output ./nixos-migration --desktop hyprland --config-inspection hypr-inspection.json
+```
+
+The Hyprland profile recognizes only `general.layout` (`dwindle` or `master`)
+and `input.natural_scroll` booleans. It reports these for review; it does not
+write user configuration or migrate keybindings, environment entries, commands,
+includes or other settings. Includes and ambiguous blocks make the findings
+incomplete and suppress values because they might be overridden.
+
+The Docker profile recognizes only the JSON boolean `live-restore`, rejects
+duplicate keys, and omits other settings. When an inspection is supplied to
+`generate`, nixify writes the corresponding Docker option only if the inventory
+shows the system Docker service persistently enabled. This does not migrate
+Docker data or other daemon settings. Inspect and review the original files and
+output; a successful inspection is not configuration equivalence. Add profiles
+and typed translation rules for additional formats rather than accepting
+arbitrary source keys as Nix expressions.
 
 ## Review more package mappings
 
@@ -64,6 +214,43 @@ After checking individual packages yourself, create a review file. This example 
 
 Pass it explicitly to `nixify report --input inventory.json --reviewed-mappings review.json` or `nixify generate --input inventory.json --output ./nixos-migration --reviewed-mappings review.json`. Each source must be explicitly installed; foreign packages can also be overridden by explicit review. Attribute values are dot-separated Nixpkgs paths such as `xfce.exo`, not arbitrary Nix expressions; each path component is validated and quoted. If the review declares a revision, it must match the generated flake pin. The report labels these as user-reviewed, not automatically verified; use `validate --nixpkgs` to check attribute existence. Review files and suggestions disclose installed software and should be protected like inventories.
 
+## Optional NixOS Search catalog
+
+The `catalog-suggest` command reads the decompressed `packages.json` channel
+catalog also used by NixOS Search's `flake-info`. It searches unresolved,
+explicitly installed packages locally, including nested attribute names and
+possible `-bin`/`-git` variants for foreign packages, plus selected distro
+naming conventions such as `grep`/`gnugrep` and `xorg-xinit`/`xinit`. It does not contact a
+server, select mappings, or modify the draft. Results are candidates only: a
+name match does not establish equivalence, provenance, buildability or target
+availability. Catalog reports disclose installed software.
+
+For example, obtain a channel catalog and its revision from the **same resolved
+release** (the channel itself moves). This requires `curl` and `brotli`, and
+the decompressed JSON can occupy hundreds of megabytes:
+
+```sh
+curl -fsSL -o packages.json.br -w '%{url_effective}' \
+  https://channels.nixos.org/nixos-26.05/packages.json.br > catalog-url.txt
+catalog_url=$(cat catalog-url.txt)
+curl -fsSL "${catalog_url%/*}/git-revision" -o catalog-revision.txt
+brotli --decompress --keep packages.json.br
+nixify catalog-suggest --input inventory.json --catalog packages.json \
+  --revision "$(cat catalog-revision.txt)" --output catalog-matches.json
+```
+
+This example uses the NixOS 26.05 stable channel. The catalog is streamed and
+limited to 1 GiB uncompressed. The revision is user-supplied metadata and is
+not authenticated against the catalog; compare it with your intended target pin.
+Nixify currently defaults its generated flake to the revision in its own
+`flake.lock`, which tracks nixos-unstable. To use this catalog revision as the
+target instead, pass `--nixpkgs-rev "$(cat catalog-revision.txt)"` to
+`nixify generate`; the generated flake still needs to be resolved and validated. Downloading the public catalog does not send the
+inventory to NixOS, and matching happens locally. An existing `packages.json`
+from a fixed release can be reused offline. The report does not establish that
+a match is available on the selected architecture. See the [NixOS Search
+flake-info documentation](https://github.com/NixOS/nixos-search/tree/main/flake-info#nixpkgs).
+
 ## Optional NixOS baseline
 
 With Nix installed, evaluate a local Nixpkgs checkout (this does not build or activate a system), then compare names:
@@ -77,12 +264,13 @@ For a channel-based installation, the local path may be `/nix/var/nix/profiles/p
 
 ## Privacy
 
-Inventories disclose installed package names, versions, origin flags, architecture and distribution. Treat them as sensitive. The scanner does not read private keys, credentials, home directories, Wi-Fi settings, arbitrary environment variables or service configuration. It reads only `XDG_CURRENT_DESKTOP` and `XDG_SESSION_TYPE` as optional session hints, retaining recognized values only; it checks known session-file paths without reading their contents. Hardware inventory includes CPU model, PCI display/network vendor and model, block-device types, sizes and filesystem types; these can identify your machine. It excludes device names, serials, UUIDs and non-system mount paths. Inventory and draft files are created with owner-only permissions on Unix. Review before sharing. A requested Nixpkgs baseline runs `nix-instantiate` on the specified checkout, so only evaluate a source you trust.
+Inventories disclose installed package names, versions, origin flags, architecture and distribution. Treat them as sensitive. The scanner checks a small fixed set of system and scanning-user configuration paths for file presence; it does not read their contents, follow discovered symlinks, or retain the home directory path. It does not read private keys, credentials, Wi-Fi settings, or arbitrary environment variables. It reads only `XDG_CURRENT_DESKTOP` and `XDG_SESSION_TYPE` as optional session hints, retaining recognized values only; it checks known session-file paths without reading their contents. Hardware inventory includes CPU model, PCI display/network vendor and model, block-device types, sizes and filesystem types; these can identify your machine. It excludes device names, serials, UUIDs and non-system mount paths. Inventory and draft files are created with owner-only permissions on Unix. Review before sharing. A requested Nixpkgs baseline runs `nix-instantiate` on the specified checkout, so only evaluate a source you trust.
 
 ## Development
 
 ```sh
 cargo test --locked
+cargo test --locked nix_target_coverage_respects_outputs_and_link_priority -- --ignored # requires nix-instantiate
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
 nix develop
