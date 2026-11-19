@@ -4,6 +4,8 @@
 
 This is **an early migration draft, not a bootable system**. Hardware discovery is partial and full NixOS system evaluation is not implemented yet. Package-attribute checks are available against an explicitly supplied local checkout. The generated flake is intentionally incomplete. Desktop discovery is limited to a small set of recognizable signals. Curated mappings must be verified against your selected Nixpkgs revision.
 
+See the [complete generated desktop draft](examples/manjaro-desktop/) for a real example of the configuration output.
+
 ## Use
 
 A compiled Rust binary runs on Manjaro without Nix. From source, install Rust and build with `cargo build --release`.
